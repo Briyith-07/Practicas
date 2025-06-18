@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>SST</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+            color: #333;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            background-color: #003366;
+            padding: 10px 20px;
+            color: white;
+        }
+
+        .top-nav {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .top-nav a {
+            color: white;
+            margin-left: 15px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .main-nav {
+            margin-top: 10px;
+            display: flex;
+            justify-content: center;
+            background-color: #0055a5;
+            padding: 10px 0;
+        }
+
+        .main-nav a {
+            color: white;
+            margin: 0 20px;
+            text-decoration: none;
+        }
+
+        .main-content {
+            flex: 1;
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        footer {
+            background-color: #003366;
+            color: white;
+            text-align: center;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="top-nav">
+            <a href="{% url 'login' %}">Iniciar Sesión</a>
+            <a href="{% url 'register' %}">Registrarse</a>
+        </div>
+
+        <nav class="main-nav">
+            <a href="{% url 'inicio' %}">Inicio</a>
+            <a href="#">Sobre Nosotros</a>
+            <a href="#">Contacto</a>
+        </nav>
+    </header>
+
+    <div class="main-content">
+        <h1>Bienvenido al Sistema SST</h1>
+        <p>Gestiona tus actividades de Seguridad y Salud en el Trabajo de forma eficiente.</p>
+    </div>
+
+    <footer>
+        &copy; 2025 - SST
+    </footer>
+</div>
+
+</body>
+</html>
