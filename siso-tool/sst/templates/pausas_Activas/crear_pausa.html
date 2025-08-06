@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Crear Pausa Activa{% endblock %}
+
+{% block content %}
+<div class="container d-flex justify-content-center align-items-center py-5" style="min-height: 90vh;">
+  <div class="card shadow-lg p-5 w-100" style="max-width: 750px;">
+    <h2 class="text-center mb-4">
+      <span class="fs-1 align-middle">🛑</span> Crear Pausa Activa
+    </h2>
+
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      <div class="mb-4">
+        <label for="tipo" class="form-label fw-bold">Tipo de Pausa</label>
+        <select name="tipo" id="tipo" class="form-select" required onchange="mostrarCamposTipo()">
+          <option value="" {% if not request.POST.tipo %}selected{% endif %} disabled>Seleccione un tipo</option>
+          <option value="sopa" {% if request.POST.tipo == 'sopa' %}selected{% endif %}>🧩 Sopa de Letras</option>
+          <option value="crucigrama" {% if request.POST.tipo == 'crucigrama' %}selected{% endif %}>✏ Crucigrama</option>
+          <option value="movimiento" {% if request.POST.tipo == 'movimiento' %}selected{% endif %}>🧘 Movimiento Articular</option>
+        </select>
+      </div>
+
+      <!-- SOPA DE LETRAS -->
+      <div id="sopaCampos" class="tipo-campos" style="display:none;">
+        <h5 class="fw-semibold mb-3">🧩 Tema de la Sopa de Letras</h5>
+        <div class="mb-3">
+          <label class="form-label">Tamaño de la cuadrícula (por ejemplo 10 para 10x10)</label>
+          <input type="number" name="tamano_cuadricula" id="tamano_cuadricula" class="form-control" min="5" max="20" value="10" required>
+        </div>
+        <div class="mb-4">
+          <label class="form-label">Selecciona un tema</label>
+          <select name="tema_sopa" id="tema_sopa" class="form-select" required>
+            <option value="">Cargando temas...</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- CRUCIGRAMA -->
+      <div id="crucigramaCampos" class="tipo-campos" style="display:none;">
+        <h5 class="fw-semibold mb-3">✏ Tema del Crucigrama</h5>
+        <div class="mb-4">
+          <label class="form-label">Selecciona un tema</label>
+          <select name="tema_crucigrama" id="tema_crucigrama" class="form-select" required>
+            <option value="">Cargando temas...</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- MOVIMIENTO ARTICULAR -->
+      <div id="movimientoCampos" class="tipo-campos" style="display:none;">
+        <h5 class="fw-semibold mb-3">🧘 Datos de Movimiento Articular</h5>
+        <div class="mb-3">
+          <label class="form-label">Nombre del movimiento</label>
+          <input type="text" name="nombre_mov" class="form-control">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Descripción</label>
+          <textarea name="descripcion_mov" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="mb-4">
+          <label class="form-label">Imagen</label>
+          <input type="file" name="imagen" class="form-control">
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-between mt-4">
+        <a href="/estadisticas/pausas/" class="btn btn-outline-secondary">← Volver</a>
+        <button type="button" id="btn-crear-pausa" class="btn btn-primary">
+          <i class="bi bi-plus-circle me-1"></i> Crear Pausa Activa
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+{% if pausa_creada %}
+<script>
+Swal.fire({
+  icon: 'success',
+  title: '¡Pausa Creada!',
+  text: 'La pausa activa "{{ nombre_pausa }}" fue registrada exitosamente.',
+  confirmButtonText: 'OK'
+}).then((result) => {
+  if (result.isConfirmed) {
+    window.location.href = "/pausas/crear/";
+  }
+});
+</script>
+{% endif %}
+
+<script>
+function mostrarCamposTipo() {
+  const tipo = document.getElementById("tipo").value;
+  document.querySelectorAll(".tipo-campos").forEach(div => div.style.display = 'none');
+
+  if (tipo === "sopa") {
+    document.getElementById("sopaCampos").style.display = "block";
+    cargarTemasSopa();
+  }
+  if (tipo === "crucigrama") {
+    document.getElementById("crucigramaCampos").style.display = "block";
+    cargarTemasCrucigrama();
+  }
+  if (tipo === "movimiento") {
+    document.getElementById("movimientoCampos").style.display = "block";
+  }
+}
+
+document.addEventListener("DOMContentLoaded", mostrarCamposTipo);
+
+function cargarTemasSopa() {
+  fetch("/obtener-temas/")
+    .then(response => response.json())
+    .then(data => {
+      const select = document.getElementById("tema_sopa");
+      select.innerHTML = '<option value="">Seleccione un tema</option>';
+      data.temas.forEach(t => {
+        const opt = document.createElement("option");
+        opt.value = t.id; // 🔁 Este valor debe ser el ID numérico
+        opt.textContent = t.nombre;
+        select.appendChild(opt);
+      });
+    })
+    .catch(err => {
+      console.error("Error al cargar temas:", err);
+      document.getElementById("tema_sopa").innerHTML = '<option value="">No se pudieron cargar los temas</option>';
+    });
+}
+
+function cargarTemasCrucigrama() {
+  fetch("/obtener-temas-crucigrama/")
+    .then(response => response.json())
+    .then(data => {
+      const select = document.getElementById("tema_crucigrama");
+      select.innerHTML = '<option value="">Seleccione un tema</option>';
+      data.temas.forEach(t => {
+        const opt = document.createElement("option");
+        opt.value = t.id; // 🔁 Este valor debe ser el ID numérico
+        opt.textContent = t.nombre;
+        select.appendChild(opt);
+      });
+    })
+    .catch(err => {
+      console.error("Error al cargar temas:", err);
+      document.getElementById("tema_crucigrama").innerHTML = '<option value="">No se pudieron cargar los temas</option>';
+    });
+}
+
+document.getElementById("btn-crear-pausa").addEventListener("click", function () {
+  const tipo = document.getElementById("tipo").value;
+  const form = document.querySelector("form");
+
+  if (!tipo) {
+    Swal.fire({ icon: 'warning', title: 'Falta el tipo de pausa', text: 'Debe seleccionar un tipo de pausa activa.' });
+    return;
+  }
+
+  if (tipo === "sopa") {
+    const tema = document.getElementById("tema_sopa").value;
+    const tamano = document.getElementById("tamano_cuadricula").value;
+    if (!tema || !tamano) {
+      Swal.fire({ icon: 'warning', title: 'Datos incompletos', text: 'Debes seleccionar un tema y un tamaño para la sopa de letras.' });
+      return;
+    }
+  }
+
+  if (tipo === "crucigrama") {
+    const tema = document.getElementById("tema_crucigrama").value;
+    if (!tema) {
+      Swal.fire({ icon: 'warning', title: 'Tema no seleccionado', text: 'Debe seleccionar un tema para el crucigrama.' });
+      return;
+    }
+  }
+
+  if (tipo === "movimiento") {
+    const nombre = document.querySelector('[name="nombre_mov"]').value.trim();
+    const descripcion = document.querySelector('[name="descripcion_mov"]').value.trim();
+    const imagen = document.querySelector('[name="imagen"]').value;
+    if (!nombre || !descripcion || !imagen) {
+      Swal.fire({ icon: 'warning', title: 'Campos incompletos', text: 'Debes completar todos los campos del movimiento articular.' });
+      return;
+    }
+  }
+
+  form.submit();
+});
+</script>
+{% endblock %}

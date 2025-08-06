@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block title %}Estadísticas de Pausas{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2 class="text-center mb-4">📊 Estadísticas de Pausas Activas</h2>
+
+  <div class="row text-center mb-4">
+
+    <div class="col">
+      <a href="{% url 'crear_pausa' %}" class="text-decoration-none">
+        <div class="card shadow-sm border-0" style="background-color: #007bff;">
+          <div class="card-body text-white">
+            <h5 class="card-title">Crear Pausa</h5>
+            <p class="card-text display-6">{{ total_pausas_creadas }}</p>
+
+          </div>
+        </div>
+      </a>
+    </div>
+
+    <div class="col">
+      <a href="{% url 'registro_pausas' %}" class="text-decoration-none">
+        <div class="card shadow-sm border-0" style="background-color: #28a745;">
+          <div class="card-body text-white">
+            <h5 class="card-title">Registro de Pausas</h5>
+            <p class="card-text display-6">{{ empleados_con_pausa }}</p>
+          </div>
+        </div>
+      </a>
+    </div>
+
+    <div class="col">
+      <a href="{% url 'ver_pausas_creadas' %}" class="text-decoration-none">
+        <div class="card shadow-sm border-0" style="background-color: #17a2b8;">
+          <div class="card-body text-white">
+            <h5 class="card-title">Ver Pausas Creadas</h5>
+            <p class="card-text display-6"><i class="bi bi-eye"></i></p>
+          </div>
+        </div>
+      </a>
+    </div>
+
+  </div>
+
+  <div class="text-end">
+    <a href="{% url 'estadisticas_menu' %}" class="btn btn-secondary mt-3">Volver</a>
+  </div>
+</div>
+{% endblock %}

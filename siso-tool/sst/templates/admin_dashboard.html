@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block title %}Panel de Administración{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="text-center mb-4">Panel de Administración</h2>
+
+  <!-- Tarjetas -->
+  <div class="row">
+    <div class="col-md-4">
+      <a href="{% url 'listar_usuarios' %}" style="text-decoration: none;">
+        <div class="card text-white bg-primary mb-3">
+          <div class="card-body text-center">
+            <h5 class="card-title">Usuarios Registrados</h5>
+            <p class="card-text display-6">{{ usuarios }}</p>
+          </div>
+        </div>
+      </a>
+    </div>
+
+    <div class="col-md-4">
+      <a href="{% url 'listar_campañas' %}" style="text-decoration: none;">
+        <div class="card text-white bg-info mb-3">
+          <div class="card-body text-center">
+            <h5 class="card-title">Campañas</h5>
+            <p class="card-text display-6">{{ campañas }}</p>
+          </div>
+        </div>
+      </a>
+    </div>
+
+    <div class="col-md-4">
+      <a href="{% url 'estadisticas_menu' %}" style="text-decoration: none;">
+        <div class="card text-white bg-info mb-3">
+          <div class="card-body text-center">
+            <h5 class="card-title">Estadísticas</h5>
+            <p class="card-text display-6"><i class="bi bi-graph-up"></i></p>
+          </div>
+        </div>
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

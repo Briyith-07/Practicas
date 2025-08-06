@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}Campañas Realizadas{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2 class="text-center mb-4">✅ Campañas Realizadas</h2>
+
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      <table class="table table-striped table-hover m-0">
+        <thead class="table-dark">
+          <tr>
+            <th>Código</th>
+            <th>Nombre</th>
+            <th>Detalle</th>
+            <th>Periodicidad</th>
+            <th>Empleado Responsable</th>
+            <th>Fecha Finalización</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for campaña in campañas_realizadas %}
+          <tr>
+            <td>{{ campaña.codigo.codigo }}</td>
+            <td>{{ campaña.codigo.nombre }}</td>
+            <td>{{ campaña.detalle }}</td>
+            <td>{{ campaña.periodicidad }}</td>
+            <td>{{ campaña.responsable.first_name }} {{ campaña.responsable.last_name }}</td>
+            <td>{{ campaña.fecha_finalizacion|date:"Y-m-d" }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center">No hay campañas finalizadas.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="text-center mt-3">
+    <a href="{% url 'estadisticas_campañas' %}" class="btn btn-secondary">⬅️ Volver al menú</a>
+  </div>
+</div>
+{% endblock %}

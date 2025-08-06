@@ -1,0 +1,124 @@
+  {% extends 'base.html' %}
+  {% block title %}Usuarios Registrados{% endblock %}
+
+  {% block content %}
+  <div class="container mt-4">
+    <h2 class="text-center mb-4">Usuarios Registrados</h2>
+
+    <div class="d-flex justify-content-end mb-3 gap-2">
+      <div class="dropdown d-inline-block me-2">
+    <button class="btn btn-outline-dark dropdown-toggle" type="button" data-bs-toggle="dropdown">
+      Exportar
+    </button>
+    <ul class="dropdown-menu">
+      <li><a class="dropdown-item" href="{% url 'exportar_usuarios_pdf' %}">Exportar a PDF</a></li>
+      <li><a class="dropdown-item" href="{% url 'exportar_usuarios_excel' %}">Exportar a Excel</a></li>
+    </ul>
+  </div>
+      <a href="{% url 'crear_usuario' %}" class="btn btn-success">Crear Usuario</a>
+    </div>
+
+    <table class="table table-bordered table-striped table-responsive">
+      <thead class="table-dark text-center align-middle">
+        <tr>
+          <th>#</th>
+          <th>Nombre</th>
+          <th>Apellidos</th>
+          <th>Teléfono</th>
+          <th>Departamento</th>
+          <th>Ciudad</th>
+          <th>Dirección</th>
+          <th>Email</th>
+          <th>Rol</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for usuario in usuarios %}
+        <tr>
+          <td>{{ forloop.counter }}</td>
+          <td>{{ usuario.first_name }}</td>
+          <td>{{ usuario.last_name }}</td>
+          <td>{{ usuario.telefono }}</td>
+          <td>{{ usuario.departamento }}</td>
+          <td>{{ usuario.ciudad }}</td>
+          <td>{{ usuario.direccion }}</td>
+          <td>{{ usuario.email }}</td>
+          <td>{{ usuario.get_cargo_display }}</td>
+          <td>
+            {% if usuario.is_active %}
+              <span class="text-success fw-bold">Activo</span>
+            {% else %}
+              <span class="text-danger fw-bold">Inactivo</span>
+            {% endif %}
+          </td>
+          <td class="text-nowrap">
+            <div class="d-flex gap-1">
+              <a href="{% url 'editar_usuario' usuario.id %}" class="btn btn-sm btn-warning">Editar</a>
+
+              {% if usuario.is_active %}
+              <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#modalInhabilitar{{ usuario.id }}">
+                Inhabilitar
+              </button>
+
+              <div class="modal fade" id="modalInhabilitar{{ usuario.id }}" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                  <div class="modal-content border-danger">
+                    <div class="modal-header bg-danger text-white">
+                      <h5 class="modal-title">Confirmar Inhabilitación</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                      ¿Estás seguro de que deseas inhabilitar a <strong>{{ usuario.first_name }} {{ usuario.last_name }}</strong>?
+                    </div>
+                    <div class="modal-footer">
+                      <form method="post" action="{% url 'inhabilitar_usuario' usuario.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">Sí, Inhabilitar</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {% else %}
+              <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#modalHabilitar{{ usuario.id }}">
+                Habilitar
+              </button>
+
+              <div class="modal fade" id="modalHabilitar{{ usuario.id }}" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                  <div class="modal-content border-success">
+                    <div class="modal-header bg-success text-white">
+                      <h5 class="modal-title">Confirmar Habilitación</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                      ¿Deseas habilitar nuevamente a <strong>{{ usuario.first_name }} {{ usuario.last_name }}</strong>?
+                    </div>
+                    <div class="modal-footer">
+                      <a href="{% url 'habilitar_usuario' usuario.id %}" class="btn btn-success">Sí, Habilitar</a>
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="11" class="text-center">No hay usuarios registrados.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="text-center mt-4">
+      <a href="/panel/dashboard/" class="btn btn-secondary">Volver</a>
+    </div>
+  </div>
+  {% endblock %}

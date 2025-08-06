@@ -1,0 +1,209 @@
+{% extends 'base.html' %}
+{% block title %}Crear Usuario{% endblock %}
+
+{% block content %}
+<style>
+  .valid {
+    color: rgba(3, 181, 3, 0.662);
+    font-weight: bold;
+  }
+  .invalid {
+    color: rgba(131, 127, 127, 0.537);
+    font-weight: bold;
+  }
+</style>
+
+<div class="container mt-5">
+  <div class="card shadow p-4">
+    <h2 class="text-center mb-3">Registrar Usuario</h2>
+
+    {% if form.errors %}
+      <div class="alert alert-danger">
+        <ul class="mb-0">
+          {% for field in form %}
+            {% for error in field.errors %}
+              <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+            {% endfor %}
+          {% endfor %}
+          {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <div class="row">
+        <div class="col-md-6 mb-3">
+          {{ form.first_name.label_tag }}
+          {{ form.first_name }}
+        </div>
+
+        <div class="col-md-6 mb-3">
+          {{ form.last_name.label_tag }}
+          {{ form.last_name }}
+        </div>
+
+        <div class="col-md-6 mb-3">
+          {{ form.telefono.label_tag }}
+          {{ form.telefono }}
+        </div>
+
+        <div class="col-md-6 mb-3">
+          {{ form.departamento.label_tag }}
+          {{ form.departamento }}
+        </div>
+
+        <div class="col-md-6 mb-3">
+          {{ form.ciudad.label_tag }}
+          {{ form.ciudad }}
+        </div>
+
+        <div class="col-md-6 mb-3">
+          {{ form.direccion.label_tag }}
+          {{ form.direccion }}
+        </div>
+
+        <div class="col-md-6 mb-3">
+          {{ form.email.label_tag }}
+          {{ form.email }}
+        </div>
+
+        <div class="col-md-6 mb-3">
+          {{ form.cargo.label_tag }}
+          <select name="{{ form.cargo.name }}" id="{{ form.cargo.id_for_label }}" class="form-control">
+            <option value="" selected>Seleccione un rol</option>
+            {% for value, label in form.cargo.field.choices %}
+              <option value="{{ value }}" {% if form.cargo.value == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          {{ form.password1.label_tag }}
+          <div class="input-group">
+            {{ form.password1 }}
+            <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('id_password1')">👁</button>
+          </div>
+          <ul id="password-requirements" class="mt-2 mb-0">
+            <li id="lower-upper" class="invalid">✔ Minúsculas y Mayúsculas</li>
+            <li id="number" class="invalid">✔ Número (0-9)</li>
+            <li id="special" class="invalid">✔ Carácter especial (^!@#$%&*)</li>
+            <li id="length" class="invalid">✔ Al menos 8 caracteres</li>
+          </ul>
+        </div>
+
+        <div class="col-md-6 mb-3">
+          {{ form.password2.label_tag }}
+          <div class="input-group">
+            {{ form.password2 }}
+            <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('id_password2')">👁</button>
+          </div>
+          <small id="password-match-msg" class="form-text text-danger"></small>
+        </div>
+      </div>
+
+      <div class="text-center">
+        <button type="submit" class="btn btn-primary w-100">Registrarse</button>
+      </div>
+
+      <div class="text-center mt-4">
+        <a href="/usuarios/" class="btn btn-secondary">Volver</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const departamentoSelect = document.getElementById('id_departamento');
+    const ciudadSelect = document.getElementById('id_ciudad');
+
+    const ciudadesPorDepartamento = {
+      "Cundinamarca": ["Girardot", "Soacha", "Fusagasugá", "Zipaquirá", "Ricaurte"],
+      "Antioquia": ["Medellín", "Envigado", "Bello", "Itagüí"],
+      "Valle del Cauca": ["Cali", "Palmira", "Buenaventura", "Tuluá"],
+      "Bogotá": ["Bogotá"]
+    };
+
+    function actualizarCiudades() {
+      const selectedDept = departamentoSelect.value;
+      ciudadSelect.innerHTML = '';
+
+      if (ciudadesPorDepartamento[selectedDept]) {
+        ciudadSelect.disabled = false;
+        ciudadSelect.appendChild(new Option("Seleccione una ciudad", ""));
+        ciudadesPorDepartamento[selectedDept].forEach(function (ciudad) {
+          ciudadSelect.appendChild(new Option(ciudad, ciudad));
+        });
+      } else {
+        ciudadSelect.disabled = true;
+        ciudadSelect.appendChild(new Option("Seleccione una ciudad", ""));
+      }
+    }
+
+    actualizarCiudades(); // Inicialización si ya hay valor
+    departamentoSelect.addEventListener('change', actualizarCiudades);
+  });
+
+  // Mostrar/Ocultar contraseñas
+  function togglePassword(id) {
+    const input = document.getElementById(id);
+    input.type = input.type === "password" ? "text" : "password";
+  }
+
+  // Validaciones de contraseña
+  const passwordInput = document.getElementById("id_password1");
+  const passwordConfirm = document.getElementById("id_password2");
+  const lowerUpper = document.getElementById("lower-upper");
+  const number = document.getElementById("number");
+  const special = document.getElementById("special");
+  const length = document.getElementById("length");
+  const matchMsg = document.getElementById("password-match-msg");
+
+  function validarPassword() {
+    const pwd = passwordInput.value;
+    const hasLower = /[a-z]/.test(pwd);
+    const hasUpper = /[A-Z]/.test(pwd);
+    const hasNumber = /\d/.test(pwd);
+    const hasSpecial = /[\^!@#$%&*]/.test(pwd);
+    const hasLength = pwd.length >= 8;
+
+    lowerUpper.classList.toggle("valid", hasLower && hasUpper);
+    lowerUpper.classList.toggle("invalid", !(hasLower && hasUpper));
+
+    number.classList.toggle("valid", hasNumber);
+    number.classList.toggle("invalid", !hasNumber);
+
+    special.classList.toggle("valid", hasSpecial);
+    special.classList.toggle("invalid", !hasSpecial);
+
+    length.classList.toggle("valid", hasLength);
+    length.classList.toggle("invalid", !hasLength);
+  }
+
+  function validarCoincidencia() {
+    if (passwordInput.value && passwordConfirm.value) {
+      if (passwordInput.value === passwordConfirm.value) {
+        matchMsg.textContent = "✔ Las contraseñas coinciden.";
+        matchMsg.classList.remove("text-danger");
+        matchMsg.classList.add("text-success");
+      } else {
+        matchMsg.textContent = "✖ Las contraseñas no coinciden.";
+        matchMsg.classList.remove("text-success");
+        matchMsg.classList.add("text-danger");
+      }
+    } else {
+      matchMsg.textContent = "";
+    }
+  }
+
+  passwordInput?.addEventListener("input", () => {
+    validarPassword();
+    validarCoincidencia();
+  });
+
+  passwordConfirm?.addEventListener("input", validarCoincidencia);
+</script>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2 class="text-center mb-4">Registrar Pausa Activa</h2>
+
+  <!-- Selección del tipo de pausa (formulario GET) -->
+  <form method="get">
+    <div class="mb-3">
+      <label for="tipo" class="form-label">Tipo de Pausa</label>
+      <select name="tipo" id="tipo" class="form-select" onchange="this.form.submit()">
+        <option value="">---------</option>
+        <option value="sopa" {% if tipo == 'sopa' %}selected{% endif %}>🧩 Sopa de Letras</option>
+        <option value="crucigrama" {% if tipo == 'crucigrama' %}selected{% endif %}>✏ Crucigrama</option>
+        <option value="movimiento" {% if tipo == 'movimiento' %}selected{% endif %}>🧘 Movimiento Articular</option>
+      </select>
+    </div>
+  </form>
+
+  {% if tipo == "sopa" %}
+    <h4 class="text-center mb-3">🧩 Sopa de Letras</h4>
+
+    <!-- Cuadrícula de letras -->
+    <div class="d-flex justify-content-center mb-4">
+      <table style="border-collapse: collapse;">
+        {% for fila in matriz %}
+          <tr>
+            {% for letra in fila %}
+              <td style="border: 1px solid #000; padding: 10px; font-size: 20px; text-align: center;">
+                {{ letra }}
+              </td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </table>
+    </div>
+
+    <!-- Lista de palabras -->
+    <div class="text-center">
+      <strong>Palabras a encontrar:</strong>
+      <ul class="list-inline">
+        {% for palabra in palabras %}
+          <li class="list-inline-item">{{ palabra|upper }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <!-- Confirmación (formulario POST) -->
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="tipo" value="sopa">
+      <button type="submit" name="confirmar_pausa" class="btn btn-success mt-4">✅ Confirmar Pausa</button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

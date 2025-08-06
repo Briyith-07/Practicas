@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2 class="text-center mb-4">Campañas Asignadas</h2>
+
+  <div class="list-group">
+    {% for asignada in asignadas %}
+      <div class="list-group-item">
+        <strong>{{ asignada.campaña.codigo.codigo }}</strong> - {{ asignada.campaña.detalle|truncatewords:15 }}
+        <span class="badge bg-{{ asignada.realizada|yesno:'success,danger' }}">{{ asignada.realizada|yesno:'Realizada,Pendiente' }}</span>
+      </div>
+    {% empty %}
+      <p class="text-muted">No tienes campañas asignadas.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

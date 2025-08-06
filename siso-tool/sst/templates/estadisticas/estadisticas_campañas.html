@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block title %}Estadísticas de Campañas{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2 class="mb-5 text-center">📊 Estadísticas de Campañas</h2>
+
+  <!-- Tarjetas Totales -->
+  <div class="row text-center mb-5">
+    {% for tarjeta in datos_tarjetas %}
+    <div class="col-md-3 mb-3">
+      <a href="{% url tarjeta.url %}" class="text-decoration-none">
+        <div class="card text-white bg-{{ tarjeta.color }} shadow-sm h-100">
+          <div class="card-body">
+            <h5 class="card-title">{{ tarjeta.titulo }}</h5>
+            <p class="fs-3">{{ tarjeta.total }}</p>
+          </div>
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="text-end">
+    <a href="{% url 'estadisticas_menu' %}" class="btn btn-secondary">Volver</a>
+  </div>
+</div>
+{% endblock %}
