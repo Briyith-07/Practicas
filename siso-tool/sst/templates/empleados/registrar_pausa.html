@@ -4,7 +4,7 @@
 <div class="container mt-5">
   <h2 class="text-center mb-4">Registrar Pausa Activa</h2>
 
-  <!-- Selección del tipo de pausa (formulario GET) -->
+  <!-- Formulario GET para seleccionar tipo y pausa -->
   <form method="get">
     <div class="mb-3">
       <label for="tipo" class="form-label">Tipo de Pausa</label>
@@ -15,8 +15,26 @@
         <option value="movimiento" {% if tipo == 'movimiento' %}selected{% endif %}>🧘 Movimiento Articular</option>
       </select>
     </div>
+
+    {% if pausas_disponibles %}
+      <div class="mb-3">
+        <label for="pausa_id" class="form-label">Seleccione un tema</label>
+        <select name="pausa_id" id="pausa_id" class="form-select" onchange="this.form.submit()">
+          <option value="">---------</option>
+          {% for pausa in pausas_disponibles %}
+            {% if pausa.id|stringformat:"s"|slice:"0:7" == "predef_" %}
+
+              <option value="{{ pausa.id }}" class="text-primary">🌟 {{ pausa.tema }}</option>
+            {% else %}
+              <option value="{{ pausa.id }}">{{ pausa.tema|default:"Sin tema" }}</option>
+            {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
   </form>
 
+  <!-- Mostrar contenido según el tipo -->
   {% if tipo == "sopa" %}
     <h4 class="text-center mb-3">🧩 Sopa de Letras</h4>
 
@@ -45,12 +63,48 @@
       </ul>
     </div>
 
-    <!-- Confirmación (formulario POST) -->
-    <form method="post">
+  {% elif tipo == "crucigrama" %}
+    <h4 class="text-center mb-3">✏ Crucigrama</h4>
+
+    <!-- Tabla del crucigrama -->
+    <div class="d-flex justify-content-center mb-4">
+      <table style="border-collapse: collapse;">
+        {% for fila in crucigrama %}
+          <tr>
+            {% for celda in fila %}
+              <td style="border: 1px solid #000; width: 30px; height: 30px; text-align: center; font-size: 18px;">
+                {% if celda %}{{ celda }}{% else %}&nbsp;{% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </table>
+    </div>
+
+    <div class="text-center">
+      <strong>Palabras:</strong> {{ palabras|join:", " }}
+    </div>
+
+  {% elif tipo == "movimiento" %}
+    <h4 class="text-center mb-3">🧘 Movimiento Articular</h4>
+
+    <!-- Lista de movimientos -->
+    <ul class="list-group">
+      {% for mov in movimientos %}
+        <li class="list-group-item">{{ mov }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if tipo %}
+    <!-- Confirmación de pausa -->
+    <form method="post" class="text-center mt-4">
       {% csrf_token %}
-      <input type="hidden" name="tipo" value="sopa">
-      <button type="submit" name="confirmar_pausa" class="btn btn-success mt-4">✅ Confirmar Pausa</button>
+      <input type="hidden" name="tipo" value="{{ tipo }}">
+      <input type="hidden" name="pausa_id" value="{{ pausa_id }}">
+      <button type="submit" name="confirmar_pausa" class="btn btn-success">✅ Confirmar Pausa</button>
     </form>
   {% endif %}
+
 </div>
 {% endblock %}

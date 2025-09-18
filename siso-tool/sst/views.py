@@ -15,6 +15,7 @@ from datetime import timedelta
 from django.db.models import Subquery, OuterRef
 from django.core.serializers.json import DjangoJSONEncoder
 import random
+import string
 import json
 import io
 import xlsxwriter
@@ -39,24 +40,23 @@ from reportlab.platypus import Image
 import matplotlib
 matplotlib.use('Agg') 
 from django.utils.timezone import localtime
-from .models import RegistroPausa, Usuario
+from .models import Usuario, Campaña
 from django.contrib.auth.models import User
 from django.http import JsonResponse
-from .forms import CampanaAsignadaForm
-from .models import PausaActiva 
-from .models import SopaLetras
-from .models import CampanaAsignada, RegistroPausa, PausaActiva, Calificacion, Encuesta
-from sst.models import PausaActiva
-from .models import MovimientoArticular
+from .forms import CampanaAsignadaForm 
+from .models import CampanaAsignada, Calificacion, Encuesta
 from django.db.models import Max
-from .models import Crucigrama
 from django.utils.timezone import now
 from django.contrib import messages
-from .forms import PausaActivaForm
 from datetime import date 
-from .forms import PausaActivaForm
-from .models import TemaSopaLetras, PalabraTema,  TemaCrucigrama, DefinicionTema
-
+from .models import Grupo
+from .forms import GrupoForm
+from django.contrib import messages
+from django.core.mail import send_mail
+from django.conf import settings
+from .models import Notificacion
+from .forms import NotificacionForm
+from .forms import EditarUsuarioForm
 
 
 
@@ -243,21 +243,19 @@ def lista_actividades(request):
 
 # ========= VISTAS ADMIN =========
 
-@user_passes_test(lambda u: u.is_superuser)
-@user_passes_test(lambda u: u.is_superuser)
 def admin_dashboard(request):
     total_usuarios = Usuario.objects.count()
     total_campañas = Campaña.objects.count()
     total_asignadas = CampanaAsignada.objects.count()
+
     asignaciones_detalle = CampanaAsignada.objects.select_related('campaña', 'empleado')
     
     return render(request, 'admin_dashboard.html', {
         'usuarios': total_usuarios,
         'campañas': total_campañas,
         'asignaciones': total_asignadas,
-        'asignaciones_detalle': asignaciones_detalle
+        'asignaciones_detalle': asignaciones_detalle,
     })
-
 
 @user_passes_test(lambda u: u.is_superuser)
 def administrar_usuarios(request):
@@ -441,12 +439,6 @@ def eliminar_campaña(request, id):
         return redirect('listar_campañas')
     
     return render(request, 'campañas/eliminar_campaña.html', {'campaña': campaña})
-
-#asignar campaña
-def campañas_asignadas(request):
-    asignaciones = CampanaAsignada.objects.select_related('campaña', 'empleado').all()
-    return render(request, 'estadisticas/campanias_asignadas.html', {'asignaciones': asignaciones})
-
 
 #exportar
 def generar_grafico(datos_dict, titulo):
@@ -648,20 +640,7 @@ def listar_codigos(request):
     codigos = CodigoCampaña.objects.all()
     return render(request, 'codigos/listar_codigos.html', {'codigos': codigos})
 
-#estadisticas
-def estadisticas_pausas(request):
-    total_empleados = Usuario.objects.filter(cargo='empleado').count()
-    empleados_con_pausa = RegistroPausa.objects.values('empleado').distinct().count()
-    empleados_sin_pausa = total_empleados - empleados_con_pausa
 
-    pausas = RegistroPausa.objects.select_related('empleado').all()
-
-    return render(request, 'estadisticas/estadisticas_pausas.html', {
-        'total_empleados': total_empleados,
-        'empleados_con_pausa': empleados_con_pausa,
-        'empleados_sin_pausa': empleados_sin_pausa,
-        'pausas': pausas,
-    })
 
 def estadisticas_menu(request):
     total_campañas = Campaña.objects.count()
@@ -744,278 +723,243 @@ def estadisticas_campañas(request):
         'campañas': campañas,
         'datos_tarjetas': datos_tarjetas
     })
-    
 
-# Temas predefinidos con palabras para sopa de letras y crucigramas
-TEMAS_SOPA = {
-    'salud': ['vitamina', 'agua', 'dieta', 'deporte', 'higiene'],
-    'naturaleza': ['arbol', 'rio', 'sol', 'nube', 'montaña'],
-    'animales': ['perro', 'gato', 'tigre', 'pez', 'aguila'],
-}
+# === GRUPOS ===
+@user_passes_test(lambda u: u.is_superuser)
+def listar_grupos(request):
+    grupos = Grupo.objects.all()
+    return render(request, 'grupos/listar.html', {'grupos': grupos})
 
-TEMAS_CRUCIGRAMA = {
-    'frutas': {
-        'manzana': 'Fruta roja o verde, crece en árboles.',
-        'pera': 'Fruta jugosa, forma de bombilla.',
-        'banana': 'Fruta alargada y amarilla.'
-    },
-    'cuerpo': {
-        'corazon': 'Órgano que bombea sangre.',
-        'ojo': 'Permite la visión.',
-        'pulmon': 'Órgano para respirar.'
-    }
-}
-
-def crear_pausa(request):
-    TIPOS_PAUSA_NOMBRE = {
-        'sopa': 'Sopa de Letras',
-        'crucigrama': 'Crucigrama',
-        'movimiento': 'Movimiento Articular'
-    }
-
+@user_passes_test(lambda u: u.is_superuser)
+def crear_grupo(request):
     if request.method == 'POST':
-        tipo = request.POST.get('tipo')
-
-        # ----------- 🧩 Sopa de Letras ------------
-        if tipo == 'sopa':
-            tema_sopa_id = request.POST.get('tema_sopa')
-            if not tema_sopa_id:
-                messages.error(request, "❌ Debes seleccionar un tema para la sopa de letras.")
-                return render(request, 'pausas_Activas/crear_pausa.html')
-
-            try:
-                tema_obj = TemaSopaLetras.objects.get(id=int(tema_sopa_id))
-            except TemaSopaLetras.DoesNotExist:
-                messages.error(request, "❌ Tema no válido.")
-                return render(request, 'pausas_Activas/crear_pausa.html')
-
-            palabras = list(tema_obj.palabras.values_list('texto', flat=True))
-            if not palabras:
-                messages.error(request, "❌ El tema no tiene palabras registradas.")
-                return render(request, 'pausas_Activas/crear_pausa.html')
-
-            palabras_random = random.sample(palabras, min(len(palabras), 10))
-            titulo = f"Sopa de Letras - {tema_obj.nombre.capitalize()}"
-            instrucciones = f"Encuentra las siguientes palabras relacionadas con {tema_obj.nombre}."
-            nombre = titulo
-            descripcion = instrucciones
-            cargo = "empleado"
-
-        # ----------- ✏ Crucigrama ------------
-        elif tipo == 'crucigrama':
-            tema_cruci_id = request.POST.get('tema_crucigrama')
-            if not tema_cruci_id:
-                messages.error(request, "❌ Debes seleccionar un tema para el crucigrama.")
-                return render(request, 'pausas_Activas/crear_pausa.html')
-
-            try:
-                tema_obj = TemaCrucigrama.objects.get(id=int(tema_cruci_id))
-            except TemaCrucigrama.DoesNotExist:
-                messages.error(request, "❌ Tema no válido.")
-                return render(request, 'pausas_Activas/crear_pausa.html')
-
-            definiciones_qs = tema_obj.definiciones.all()
-            if not definiciones_qs.exists():
-                messages.error(request, "❌ El tema seleccionado no tiene definiciones.")
-                return render(request, 'pausas_Activas/crear_pausa.html')
-
-            definiciones_dict = {d.palabra: d.definicion for d in definiciones_qs}
-            definiciones_json = json.dumps(definiciones_dict, ensure_ascii=False)  # ✅ SERIALIZACIÓN AQUÍ
-
-            titulo = f"Crucigrama - {tema_obj.nombre.capitalize()}"
-            instrucciones = f"Completa el crucigrama relacionado con {tema_obj.nombre}."
-            nombre = titulo
-            descripcion = instrucciones
-            cargo = "empleado"
-
-        # ----------- 🧘 Movimiento Articular ------------
-        elif tipo == 'movimiento':
-            nombre_mov = request.POST.get('nombre_mov')
-            descripcion_mov = request.POST.get('descripcion_mov')
-            imagen = request.FILES.get('imagen')
-
-            if not nombre_mov or not descripcion_mov or not imagen:
-                messages.error(request, "❌ Todos los campos del movimiento articular son obligatorios.")
-                return render(request, 'pausas_Activas/crear_pausa.html')
-
-            nombre = nombre_mov
-            descripcion = descripcion_mov
-            cargo = "general"
-
-        else:
-            messages.error(request, "❌ Tipo de pausa no válido.")
-            return redirect('crear_pausa')
-
-        # ------- Creación de PausaActiva -------
-        pausa = PausaActiva.objects.create(
-            nombre=nombre,
-            descripcion=descripcion,
-            tipo=tipo,
-            cargo=cargo,
-            fecha=now()
-        )
-
-        request.session['pausa_id'] = pausa.id
-
-        # ---- Crea tipo específico asociado ----
-        if tipo == 'sopa':
-            SopaLetras.objects.create(
-                titulo=titulo,
-                instrucciones=instrucciones,
-                palabras=", ".join(palabras_random),
-                pausa=pausa
-            )
-
-        elif tipo == 'crucigrama':
-            Crucigrama.objects.create(
-                titulo=titulo,
-                instrucciones=instrucciones,
-                definiciones=definiciones_json,  
-                pausa=pausa
-            )
-
-        elif tipo == 'movimiento':
-            orden = MovimientoArticular.objects.aggregate(Max('orden'))['orden__max'] or 0
-            MovimientoArticular.objects.create(
-                nombre=nombre_mov,
-                descripcion=descripcion_mov,
-                imagen=imagen,
-                orden=orden + 1,
-                pausa=pausa
-            )
-
-        return render(request, 'pausas_Activas/crear_pausa.html', {
-            'pausa_creada': True,
-            'nombre_pausa': TIPOS_PAUSA_NOMBRE.get(tipo, 'Pausa Activa')
-        })
-
-    return render(request, 'pausas_Activas/crear_pausa.html')
-
-def generar_palabras_para_sopa(tema_id):
-    tema = TemaSopaLetras.objects.get(id=tema_id)
-    palabras = list(tema.palabras.values_list('texto', flat=True))
-    return random.sample(palabras, 10) if len(palabras) >= 10 else palabras
-
-def obtener_temas(request):
-    temas = TemaSopaLetras.objects.all().values('id', 'nombre')
-    return JsonResponse({'temas': list(temas)})
-
-def obtener_temas_crucigrama(request):
-    temas = list(TemaCrucigrama.objects.values('id', 'nombre'))
-    return JsonResponse({'temas': temas})
-#-----------------------------------------------------------------------------------#
-def editar_pausa(request, pausa_id):
-    pausa = get_object_or_404(PausaActiva, id=pausa_id)
-    if request.method == 'POST':
-        form = PausaActivaForm(request.POST, instance=pausa)
+        form = GrupoForm(request.POST)
         if form.is_valid():
             form.save()
-            return redirect('ver_pausas_creadas')  # Asegúrate de tener esta vista nombrada así
+            messages.success(request, "Grupo creado correctamente.")
+            return redirect('listar_grupos')
     else:
-        form = PausaActivaForm(instance=pausa)
-    return render(request, 'pausas_Activas/editar_pausa.html', {'form': form})
+        form = GrupoForm()
+    return render(request, 'grupos/crear.html', {'form': form})
 
-def eliminar_pausa(request, pausa_id):
-    pausa = get_object_or_404(PausaActiva, id=pausa_id)
+@user_passes_test(lambda u: u.is_superuser)
+def editar_grupo(request, id):
+    grupo = get_object_or_404(Grupo, id=id)
     if request.method == 'POST':
-        pausa.delete()
-        return redirect('ver_pausas_creadas')
-    return render(request, 'pausas_Activas/eliminar_pausa.html', {'pausa': pausa})
+        form = GrupoForm(request.POST, instance=grupo)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Grupo actualizado.")
+            return redirect('listar_grupos')
+    else:
+        form = GrupoForm(instance=grupo)
+    return render(request, 'grupos/editar.html', {'form': form, 'grupo': grupo})
 
-#-----------------------------------------------------------------------------------#
-def registro_pausas(request):
-    registros = RegistroPausa.objects.select_related('empleado', 'pausa').order_by('-fecha')
-    return render(request, 'pausas_Activas/registro_pausas.html', {
-        'registros': registros
-    })
-    
+@user_passes_test(lambda u: u.is_superuser)
+def eliminar_grupo(request, id):
+    grupo = get_object_or_404(Grupo, id=id)
+    if request.method == 'POST':
+        grupo.delete()
+        messages.warning(request, "Grupo eliminado.")
+        return redirect('listar_grupos')
+    return render(request, 'grupos/eliminar.html', {'grupo': grupo})
+
+#pausa
 def registrar_pausa(request):
-    tipo = request.GET.get("tipo") or request.POST.get("tipo")
+    return render(request, "registrar_pausa.html")
 
-    # Si se confirmó la pausa
-    if request.method == "POST" and request.POST.get("confirmar_pausa"):
-        empleado = request.user
-        pausa = PausaActiva.objects.filter(tipo=tipo).last()
+# === ASIGNACIÓN DE CAMPAÑAS ===
+@user_passes_test(lambda u: u.is_superuser)
+def asignar_campaña(request):
+    if request.method == 'POST':
+        form = CampanaAsignadaForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Campaña asignada correctamente.")
+            return redirect('listar_asignaciones')
+    else:
+        form = CampanaAsignadaForm()
+    return render(request, 'asignaciones/asignar.html', {'form': form})
 
-        if pausa:
-            RegistroPausa.objects.create(empleado=empleado, pausa=pausa)
-            return redirect('registro_pausas')  # Asegúrate de que esta ruta exista
+@user_passes_test(lambda u: u.is_superuser)
+def listar_asignaciones(request):
+    asignaciones = CampanaAsignada.objects.select_related('campaña', 'empleado')
+    return render(request, 'asignaciones/listar.html', {'asignaciones': asignaciones})
 
-    # Mostrar la sopa de letras
-    if tipo == "sopa":
-        pausa = PausaActiva.objects.filter(tipo="sopa").last()
-        if not pausa:
-            return render(request, 'empleados/registrar_pausa.html', {'tipo': tipo, 'error': 'No hay sopas disponibles.'})
+@user_passes_test(lambda u: u.is_superuser)
+def eliminar_asignacion(request, id):
+    asignacion = get_object_or_404(CampanaAsignada, id=id)
+    if request.method == 'POST':
+        asignacion.delete()
+        messages.warning(request, "Asignación eliminada.")
+        return redirect('listar_asignaciones')
+    return render(request, 'asignaciones/eliminar.html', {'asignacion': asignacion})
 
-        sopa = SopaLetras.objects.get(pausa=pausa)
+def asignar_usuario_campania(request):
+    usuarios = Usuario.objects.all()
+    campanias = Campaña.objects.all()
 
-        # Convierte la matriz (cadena tipo "A,B,C,...") en lista de listas
-        plano = sopa.matriz.replace(',', '')
-        tamano = sopa.tamano
-        matriz = [list(plano[i * tamano:(i + 1) * tamano]) for i in range(tamano)]
-        palabras = sopa.palabras.split(',')
+    if request.method == "POST":
+        usuario_id = request.POST.get("usuario_id")
+        campania_id = request.POST.get("campania_id")
 
-        return render(request, 'empleados/registrar_pausa.html', {
-            'tipo': tipo,
-            'matriz': matriz,
-            'palabras': palabras
-        })
+        usuario = get_object_or_404(Usuario, id=usuario_id)
+        campania = get_object_or_404(Campaña, id=campania_id)
 
-    return render(request, 'empleados/registrar_pausa.html', {
-        'tipo': tipo
-    })
-#--------------------------------------------------------------------------------------#
-def asignacion_pausas(request):
-    return render(request, 'pausas_Activas/asignacion_pausas.html')
+        CampanaAsignada.objects.get_or_create(
+            campaña=campania,
+            empleado=usuario
+        )
 
-def ver_pausas_creadas(request):
-    pausas = PausaActiva.objects.all().order_by('-fecha')
-    return render(request, 'pausas_activas/ver_pausas_creadas.html', {'pausas': pausas})
+        messages.success(request, f"Usuario {usuario.first_name} asignado a campaña {campania.nombre}")
+        return redirect("asignar_usuario_campania")
 
-def pausas_crear_menu(request):
-    return render(request, 'pausas_Activas/crear_pausa_menu.html')
-
-def estadisticas_pausas(request):
-    total_pausas_creadas = PausaActiva.objects.count()
-    
-    empleados_con_pausa = RegistroPausa.objects.values('empleado').distinct().count()
-    total_empleados = Usuario.objects.filter(cargo='empleado').count()
-    empleados_sin_pausa = total_empleados - empleados_con_pausa
-
-    return render(request, 'estadisticas/estadisticas_pausas.html', {
-        'total_pausas_creadas': total_pausas_creadas,
-        'empleados_con_pausa': empleados_con_pausa,
-        'empleados_sin_pausa': empleados_sin_pausa,
-        'total_empleados': total_empleados
+    return render(request, "asignaciones/asignar.html", {
+        "usuarios": usuarios,
+        "campanias": campanias
     })
 
-def listar_pausas_activas(request):
-    pausas = PausaActiva.objects.all().order_by('-fecha')
-    return render(request, 'pausas_Activas/listar_pausas.html', {
-        'pausas': pausas
-    })
+#Notificaciones#
+
+def notificaciones_json(request):
+    notificaciones = Notificacion.objects.filter(
+        usuario=request.user,
+        tipo="web"
+    ).order_by("-fecha_envio")[:10]  
+
+    data = {
+        "count": notificaciones.filter(abierta=False).count(),
+        "items": [
+            {
+                "id": n.id,
+                "titulo": n.titulo,
+                "mensaje": n.mensaje,
+                "fecha": localtime(n.fecha_envio).strftime("%d/%m/%Y %H:%M"),
+                "abierta": n.abierta,
+            }
+            for n in notificaciones
+        ]
+    }
+    return JsonResponse(data)
+
+@login_required
+def marcar_notificacion_leida(request, pk):
+    if request.method == "POST":
+        notificacion = get_object_or_404(Notificacion, id=pk, usuario=request.user)
+        notificacion.abierta = True
+        notificacion.fecha_apertura = now()
+        notificacion.save()
+        return JsonResponse({"status": "ok"})
+    return JsonResponse({"status": "error", "message": "Método no permitido"}, status=405)
+
+def api_notificaciones(request):
+    usuario = request.user
+    notificaciones = Notificacion.objects.filter(usuario=usuario, abierta=False).order_by('-fecha_envio')[:10]
     
+    data = [
+        {
+            "id": n.id,
+            "titulo": n.titulo,
+            "mensaje": n.mensaje,
+            "fecha_envio": n.fecha_envio.strftime("%d/%m/%Y %H:%M"),
+        }
+        for n in notificaciones
+    ]
+    return JsonResponse(data, safe=False)
+
+def listar_notificaciones(request):
+    notificaciones = Notificacion.objects.all().select_related("campaña", "usuario")
+    return render(request, "Notificaciones/listar_notificaciones.html", {"notificaciones": notificaciones})
+
+def crear_notificacion(request):
+    if request.method == "POST":
+        form = NotificacionForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect("listar_notificaciones")
+    else:
+        form = NotificacionForm()
+    return render(request, "Notificaciones/crear_notificaciones.html", {"form": form})
+
+def detalle_notificacion(request, pk):
+    notificacion = get_object_or_404(Notificacion, pk=pk)
+    return render(request, "Notificaciones/detalle_notificaciones.html", {"notificacion": notificacion})
+
+#---------usuario---------
+def perfil_modificar(request):
+    user = request.user
+    if request.method == "POST":
+        user.telefono = request.POST.get("telefono", user.telefono)
+        user.email = request.POST.get("correo", user.email)
+        user.departamento = request.POST.get("departamento", user.departamento)
+        user.ciudad = request.POST.get("ciudad", user.ciudad)
+        user.save()
+        messages.success(request, "Perfil actualizado correctamente.")
+        return redirect('dashboard_empleado')
     
+    return redirect('dashboard_empleado')
+
+  
 # ========= VISTAS EMPLEADO =========
 
 @login_required
 def dashboard_empleado(request):
     usuario = request.user
 
-    campañas_participadas = CampanaAsignada.objects.filter(empleado=usuario, realizada=True)
-    pausas_activas = RegistroPausa.objects.filter(empleado=usuario).order_by('-fecha')[:5]
+    # Verificar si el usuario es empleado
+    es_empleado = usuario.groups.filter(name="Empleado").exists()
+
+    campañas_participadas = CampanaAsignada.objects.filter(
+        empleado=usuario, 
+        realizada=True
+    )
+
     hoy = timezone.now().date()
-    campañas_hoy = CampanaAsignada.objects.filter(empleado=usuario, campaña__fecha_asignacion=hoy)
+    campañas_hoy = CampanaAsignada.objects.filter(
+        empleado=usuario,
+        fecha_asignacion__date=hoy
+    )
+
     calificaciones = Feedback.objects.filter(empleado=usuario)
 
     return render(request, 'dashboard_empleado.html', {
         'campañas_participadas': campañas_participadas,
-        'pausas_activas': pausas_activas,
         'campañas_hoy': campañas_hoy,
         'calificaciones': calificaciones,
+        'es_empleado': es_empleado,  
+    })
+ 
+ #--------editar usuario------
+ 
+def editar_usuario(request, usuario_id):
+    usuario = get_object_or_404(User, id=usuario_id)
+    perfil, creado = Perfil.objects.get_or_create(user=usuario)
+
+    if request.method == "POST":
+        correo = request.POST.get("correo")
+        telefono = request.POST.get("telefono")
+        departamento = request.POST.get("departamento")
+        ciudad = request.POST.get("ciudad")
+
+        # Actualizar correo en User
+        usuario.email = correo
+        usuario.save()
+
+        # Actualizar perfil
+        perfil.telefono = telefono
+        perfil.departamento = departamento
+        perfil.ciudad = ciudad
+        perfil.save()
+
+        return redirect("dashboard_empleado")
+
+    return render(request, "usuarios/editar_usuario.html", {
+        "usuario": usuario,
+        "perfil": perfil
     })
 
 
+#-------------#-------------------#------------------------
 @login_required
 def campanas_asignadas(request):
     asignadas = CampanaAsignada.objects.filter(empleado=request.user)
@@ -1024,40 +968,11 @@ def campanas_asignadas(request):
 @login_required
 def realizar_campana(request):
     if request.method == 'POST':
-        # Aquí procesas los datos enviados por el formulario
+        # Procesar datos
         return redirect('dashboard_empleado')
-    return render(request, 'empleado/realizar_campana.html')
+    return render(request, 'empleados/realizar_campana.html')
 
 
-def registrar_pausa(request):
-    if request.method == 'POST':
-        form = PausaActivaForm(request.POST, request.FILES)
-        if form.is_valid():
-            form.save()
-            return redirect('dashboard_empleado')
-    else:
-        form = PausaActivaForm()
-
-    tipo = request.GET.get('tipo')
-
-    if tipo == 'sopa':
-        temas = TemaSopaLetras.objects.all()
-        return render(request, 'empleados/partials/sopa_form.html', {'temas': temas})
-    
-    elif tipo == 'crucigrama':
-        temas = TemaCrucigrama.objects.all()
-        return render(request, 'empleados/partials/crucigrama_form.html', {'temas': temas})
-    
-    elif tipo == 'movimiento':
-        return render(request, 'empleados/partials/movimiento_form.html')
-
-    # Render completo inicial si no hay tipo
-    return render(request, 'empleados/registrar_pausa.html', {'form': form})
-
-@login_required
-def ver_pausas(request):
-    pausas = RegistroPausa.objects.filter(empleado=request.user)
-    return render(request, 'empleados/ver_pausas.html', {'pausas': pausas})
 
 
 @login_required
@@ -1084,12 +999,6 @@ def feedback_empleado(request):
 
 
 
-
-
-@login_required
-def campañas_asignadas(request):
-    asignadas = CampanaAsignada.objects.filter(empleado=request.user)
-    return render(request, 'campañas_asignadas.html', {'asignadas': asignadas})
 
 @login_required
 def encuesta_campaña(request, campaña_id):
@@ -1120,3 +1029,67 @@ def feedback_campaña(request, campaña_id):
     else:
         form = FeedbackForm()
     return render(request, 'feedback_campaña.html', {'form': form, 'campaña': asignacion.campaña})
+
+
+
+# =======================
+# VISTAS DE ENCUESTA
+# =======================
+
+def encuesta_campaña(request, campaña_id):
+    campaña = get_object_or_404(Campaña, id=campaña_id)
+    asignacion = get_object_or_404(CampanaAsignada, campaña=campaña, empleado=request.user)
+
+    if request.method == 'POST':
+        form = EncuestaForm(request.POST, request.FILES)
+        if form.is_valid():
+            encuesta = form.save(commit=False)
+            encuesta.empleado = request.user
+            encuesta.campaña = campaña
+            encuesta.fecha = timezone.now()
+            encuesta.save()
+
+            # marcar como realizada
+            asignacion.realizada = True
+            asignacion.save()
+
+            messages.success(request, "¡Encuesta enviada y campaña marcada como realizada!")
+            return redirect('dashboard_empleado')
+    else:
+        form = EncuestaForm()
+
+    return render(request, 'empleados/encuesta_campaña.html', {
+        'form': form,
+        'campaña': campaña
+    })
+
+# =======================
+# VISTAS DE FEEDBACK
+# =======================
+
+@login_required
+def dar_feedback(request, asignacion_id):
+    asignacion = get_object_or_404(CampanaAsignada, id=asignacion_id, empleado=request.user)
+
+    if request.method == 'POST':
+        form = FeedbackForm(request.POST)
+        if form.is_valid():
+            feedback = form.save(commit=False)
+            feedback.empleado = request.user
+            feedback.campaña = asignacion.campaña
+            feedback.save()
+            messages.success(request, "Gracias por tu feedback.")
+            return redirect('dashboard_empleado')
+    else:
+        form = FeedbackForm()
+
+    return render(request, 'empleados/dar_feedback.html', {
+        'form': form,
+        'asignacion': asignacion
+    })
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def listar_feedback(request):
+    feedbacks = Feedback.objects.select_related('empleado', 'campaña').all()
+    return render(request, 'feedback/listar_feedback.html', {'feedbacks': feedbacks})

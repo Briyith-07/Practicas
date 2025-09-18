@@ -6,6 +6,7 @@
   <h2 class="text-center mb-4">Panel de Estadísticas</h2>
 
   <div class="row">
+    <!-- Estadísticas de Campañas -->
     <div class="col-md-6 mb-3">
       <div class="card border-primary">
         <div class="card-header bg-primary text-white">Campañas</div>
@@ -14,21 +15,12 @@
           <p><strong>Asignadas:</strong> {{ total_asignadas }}</p>
           <p><strong>Realizadas:</strong> {{ realizadas }}</p>
           <p><strong>Sin Realizar:</strong> {{ sin_realizar }}</p>
-           <a href="{% url 'estadisticas_campañas' %}" class="btn btn-outline-primary btn-sm mt-2">Ver Detalle</a>
+          <a href="{% url 'estadisticas_campañas' %}" class="btn btn-outline-primary btn-sm mt-2">Ver Detalle</a>
         </div>
       </div>
     </div>
 
-    <div class="col-md-6 mb-3">
-      <div class="card border-success">
-        <div class="card-header bg-success text-white">Pausas Activas</div>
-        <div class="card-body">
-          <p><strong>Empleados que realizaron pausas:</strong> {{ empleados_con_pausa }}</p>
-          <p><strong>Empleados que no realizaron pausas:</strong> {{ empleados_sin_pausa }}</p>
-          <a href="{% url 'estadisticas_pausas' %}" class="btn btn-outline-success btn-sm mt-2">Ver Detalle</a>
-        </div>
-      </div>
-    </div>
+   
   </div>
 
   <div class="text-end mt-4">

@@ -1,17 +1,38 @@
 {% extends 'base.html' %}
 
+{% block title %}Campañas Asignadas{% endblock %}
+
 {% block content %}
 <div class="container mt-5">
   <h2 class="text-center mb-4">Campañas Asignadas</h2>
 
-  <div class="list-group">
+  <div class="row">
     {% for asignada in asignadas %}
-      <div class="list-group-item">
-        <strong>{{ asignada.campaña.codigo.codigo }}</strong> - {{ asignada.campaña.detalle|truncatewords:15 }}
-        <span class="badge bg-{{ asignada.realizada|yesno:'success,danger' }}">{{ asignada.realizada|yesno:'Realizada,Pendiente' }}</span>
+      <div class="col-md-6 mb-4">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <h5 class="card-title">
+              <strong>Código:</strong> {{ asignada.campaña.codigo.codigo }}
+            </h5>
+            <p class="card-text">
+              {{ asignada.campaña.detalle|truncatewords:20 }}
+            </p>
+            {% if asignada.campaña.fecha_limite %}
+              <p class="mb-2"><strong>Fecha Límite:</strong> {{ asignada.campaña.fecha_limite|date:"d M Y" }}</p>
+            {% endif %}
+            <span class="badge bg-{{ asignada.realizada|yesno:'success,danger' }}">
+              {{ asignada.realizada|yesno:'Realizada,Pendiente' }}
+            </span>
+            <a href="{% url 'registrar_pausa' %}?campaña={{ asignada.campaña.id }}" class="btn btn-sm btn-primary float-end">
+              Realizar Pausa
+            </a>
+          </div>
+        </div>
       </div>
     {% empty %}
-      <p class="text-muted">No tienes campañas asignadas.</p>
+      <div class="col-12 text-center">
+        <p class="text-muted">No tienes campañas asignadas.</p>
+      </div>
     {% endfor %}
   </div>
 </div>

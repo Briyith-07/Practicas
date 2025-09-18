@@ -2,7 +2,10 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
 from .models import Campaña, Encuesta, Feedback, CodigoCampaña, CampanaAsignada  
-from .models import PausaActiva
+from .models import Grupo
+from .models import Notificacion
+from .models import Usuario
+
 
 
 Usuario = get_user_model()
@@ -201,7 +204,32 @@ class FeedbackForm(forms.ModelForm):
             'comentarios': forms.Textarea(attrs={'class': 'form-control'}),
         }
 
-class PausaActivaForm(forms.ModelForm):
+class GrupoForm(forms.ModelForm):
     class Meta:
-        model = PausaActiva
-        fields = ['tipo']
+        model = Grupo
+        fields = ["nombre", "descripcion"]
+
+
+class NotificacionForm(forms.ModelForm):
+    class Meta:
+        model = Notificacion
+        fields = ['campaña', 'usuario', 'titulo', 'mensaje', 'tipo']
+
+class EditarUsuarioForm(forms.ModelForm):
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'placeholder': 'Dejar en blanco para no cambiar'}),
+        required=False
+    )
+
+    class Meta:
+        model = Usuario
+        fields = ['first_name', 'last_name', 'email', 'telefono', 'departamento', 'ciudad']
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        password = self.cleaned_data.get('password')
+        if password:
+            user.set_password(password)
+        if commit:
+            user.save()
+        return user

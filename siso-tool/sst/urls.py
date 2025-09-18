@@ -28,11 +28,7 @@ urlpatterns = [
     path('usuarios/crear/', views.crear_usuario_admin, name='crear_usuario'),
     path('usuarios/editar/<int:usuario_id>/', views.editar_usuario, name='editar_usuario'),
     path('usuarios/inhabilitar/<int:usuario_id>/', views.inhabilitar_usuario, name='inhabilitar_usuario'),
-    path('usuarios/habilitar/<int:usuario_id>/', views.habilitar_usuario, name='habilitar_usuario'),
-
-    # Empleado
-    path('empleado/dashboard/', views.dashboard_empleado, name='dashboard_empleado'),
-    path('empleado/campanas-asignadas/', views.campañas_asignadas, name='campañas_asignadas'),
+    path('usuarios/habilitar/<int:usuario_id>/', views.habilitar_usuario, name='habilitar_usuario'),    
 
     # Encuestas y Feedback a campañas
     path('campañas/<int:campaña_id>/encuesta/', views.encuesta_campaña, name='encuesta_campana'),
@@ -65,38 +61,39 @@ urlpatterns = [
     path('campañas/exportar/excel/', views.exportar_campañas_excel, name='exportar_campañas_excel'),
     
     path('estadisticas/', views.estadisticas_menu, name='estadisticas_menu'),
-    path('estadisticas/pausas/', views.estadisticas_pausas, name='estadisticas_pausas'),
     path('estadisticas/campañas/', views.estadisticas_campañas, name='estadisticas_campañas'),
     path('estadisticas/campañas/creadas/', views.campañas_creadas, name='campañas_creadas'),
     path('estadisticas/campanias/asignadas/', views.campanias_asignadas, name='campanias_asignadas'),
     path('estadisticas/campañas/realizadas/', views.campañas_realizadas, name='campañas_realizadas'),
     path('estadisticas/campañas/sin-realizar/', views.campañas_sin_realizar, name='campañas_sin_realizar'),
     
-    #pausas
-    path('pausas/crear/', views.crear_pausa, name='crear_pausa'),
-    path('pausas/registro/', views.registro_pausas, name='registro_pausas'),
-    path('pausas/asignacion/', views.asignacion_pausas, name='asignacion_pausas'),
-    # Nuevas subrutas de pausas
-    path('pausas/crear/', views.crear_pausa, name='crear_pausa'),
-    path('pausas/creadas/', views.ver_pausas_creadas, name='ver_pausas_creadas'),
-    path('pausas/crear/', views.pausas_crear_menu, name='pausas_crear_menu'),
-    path('pausas/listar/', views.listar_pausas_activas, name='listar_pausas_activas'),
-    
-    path('pausas/editar/<int:pausa_id>/', views.editar_pausa, name='editar_pausa'),
-    path('pausas/eliminar/<int:pausa_id>/', views.eliminar_pausa, name='eliminar_pausa'),
     
     #empleados
     path('empleado/dashboard/', views.dashboard_empleado, name='dashboard_empleado'),
     path('empleado/campanas-asignadas/', views.campanas_asignadas, name='campanas_asignadas'),
     path('empleado/realizar-campana/', views.realizar_campana, name='realizar_campana'),
-    path('empleado/registrar-pausa/', views.registrar_pausa, name='registrar_pausa'),
-    path('empleado/ver-pausas/', views.ver_pausas, name='ver_pausas'),
     path('empleado/subir-evidencia/', views.subir_evidencia, name='subir_evidencia'),
     path('empleado/campanas-participadas/', views.campanas_participadas, name='campanas_participadas'),
     path('empleado/feedback/', views.feedback_empleado, name='feedback'),
     
-    path('obtener-temas/', views.obtener_temas, name='obtener_temas'),
-    path('obtener-temas-crucigrama/', views.obtener_temas_crucigrama, name='obtener_temas_crucigrama'),
+     # Asignación de usuarios a campañas
+    path('campañas/asignar/', views.asignar_usuario_campania, name='asignar_usuario_campania'),
+    
+    # CRUD de grupos
+    path('grupos/', views.listar_grupos, name='listar_grupos'),
+    path('grupos/crear/', views.crear_grupo, name='crear_grupo'),
+    
+    # Notificaciones
+    path('listar/', views.listar_notificaciones, name='listar_notificaciones'),
+    path("crear/", views.crear_notificacion, name="crear_notificacion"),
+    path("<int:pk>/", views.detalle_notificacion, name="detalle_notificacion"),
+    path("notificaciones/json/", views.notificaciones_json, name="notificaciones_json"),
+    path("notificaciones/leida/<int:pk>/", views.marcar_notificacion_leida, name="marcar_notificacion_leida"),
+    path("api/notificaciones/", views.api_notificaciones, name="api_notificaciones"),
+    
+    #usuario
+    path('perfil/modificar/', views.perfil_modificar, name='perfil_modificar'),
+    path("usuarios/editar/<int:id>/", views.editar_usuario, name="editar_usuario")
 
 
 
