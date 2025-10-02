@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">📩 Mis Notificaciones</h2>
+
+    <div class="list-group mb-4">
+        {% for notificacion in notificaciones %}
+            <a href="{% url 'detalle_notificacion_empleado' notificacion.pk %}" 
+               class="list-group-item list-group-item-action d-flex justify-content-between align-items-center
+               {% if notificacion.abierta %} list-group-item-light {% else %} list-group-item-primary {% endif %}">
+                
+                <div>
+                    <strong>{{ notificacion.titulo }}</strong><br>
+                    <small>{{ notificacion.fecha_envio|date:"d/m/Y H:i" }}</small>
+                </div>
+                
+                {% if notificacion.abierta %}
+                    <span class="badge bg-secondary">Leída</span>
+                {% else %}
+                    <span class="badge bg-success">Nueva</span>
+                {% endif %}
+            </a>
+        {% empty %}
+            <p class="text-muted">No tienes notificaciones.</p>
+        {% endfor %}
+    </div>
+
+    <!-- Botón de volver -->
+    <div class="text-center">
+        <a href="{% url 'dashboard_empleado' %}" class="btn btn-outline-primary">
+            ← Volver al Panel
+        </a>
+    </div>
+</div>
+{% endblock %}

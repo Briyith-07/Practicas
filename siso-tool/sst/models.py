@@ -5,6 +5,9 @@ from django.conf import settings
 
 
 
+
+
+
 # =========================
 #   USUARIOS Y ROLES
 # =========================
@@ -36,14 +39,15 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
         ('empleado', 'Empleado'),
     )
 
+    cedula = models.CharField(max_length=20, unique=True)
     email = models.EmailField(unique=True)
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
     cargo = models.CharField(max_length=20, choices=ROLES, default='empleado')
-    telefono = models.CharField(max_length=15, null=True, blank=True)
-    departamento = models.CharField(max_length=50, null=True, blank=True)
-    ciudad = models.CharField(max_length=50, null=True, blank=True)
-    direccion = models.CharField(max_length=255, null=True, blank=True)
+    telefono = models.CharField(max_length=15)
+    departamento = models.CharField(max_length=50)
+    ciudad = models.CharField(max_length=50)
+    direccion = models.CharField(max_length=255)
 
     codigo_temporal = models.CharField(max_length=10, null=True, blank=True)
     fecha_codigo = models.DateTimeField(null=True, blank=True)
@@ -52,12 +56,12 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['first_name', 'last_name', 'telefono', 'departamento', 'ciudad', 'direccion']
+    REQUIRED_FIELDS = ['cedula', 'first_name', 'last_name', 'telefono', 'departamento', 'ciudad', 'direccion']
 
     objects = UsuarioManager()
 
     def __str__(self):
-        return f"{self.email} - {self.cargo or 'Sin cargo'}"
+        return f"{self.first_name} {self.last_name}"
 
 
 class Rol(models.Model):
@@ -130,7 +134,7 @@ class Campaña(models.Model):
     ]
 
     codigo = models.OneToOneField(CodigoCampaña, on_delete=models.CASCADE)
-    nombre = models.CharField(max_length=100, null=True, blank=True)
+    nombre = models.CharField(max_length=100, blank=True, default='')
     detalle = models.TextField()
     estado = models.CharField(max_length=10, choices=ESTADOS)
     
@@ -139,7 +143,7 @@ class Campaña(models.Model):
     recurso = models.FileField(upload_to='campañas/', null=True, blank=True)  
     multimedia = models.FileField(upload_to='campañas/', blank=True, null=True)
     periodicidad = models.CharField(max_length=100)  # diaria, semanal, etc.
-    horarios = models.CharField(max_length=100, blank=True, null=True)  # Ej: "08:00 - 10:00"
+    horario_inicio = models.TimeField(blank=True, null=True, help_text="Hora de inicio de la pausa")
     evidencia_requerida = models.BooleanField(default=False)
 
     fecha_creacion = models.DateTimeField(auto_now_add=True)
@@ -149,7 +153,7 @@ class Campaña(models.Model):
     grupos = models.ManyToManyField("Grupo", related_name="campañas", blank=True)
 
     def __str__(self):
-        return f"Campaña {self.codigo.codigo} - {self.nombre}"
+        return f"{self.codigo.codigo} - {self.nombre or ''}"
 
 
 class CampanaAsignada(models.Model):
@@ -165,14 +169,28 @@ class CampanaAsignada(models.Model):
 # =========================
 #   NOTIFICACIONES
 # =========================
+
+#pausas activas
+
+class PausaActiva(models.Model):
+    nombre = models.CharField(max_length=100)
+    descripcion = models.TextField()
+    tipo = models.CharField(max_length=20)
+    duracion = models.PositiveIntegerField()
+
+    def __str__(self):
+        return self.nombre
+    
+    
 class Notificacion(models.Model):
     TIPOS = [
         ('correo', 'Correo Electrónico'),
         ('web', 'Notificación Web'),
-    ]
+    ]   
 
     campaña = models.ForeignKey("Campaña", on_delete=models.CASCADE)
     usuario = models.ForeignKey("Usuario", on_delete=models.CASCADE)
+    cedula = models.CharField(max_length=20, blank=True, null=True)
     titulo = models.CharField(max_length=200)
     mensaje = models.TextField()
     tipo = models.CharField(max_length=10, choices=TIPOS, default='web')
@@ -180,9 +198,13 @@ class Notificacion(models.Model):
     abierta = models.BooleanField(default=False)
     fecha_envio = models.DateTimeField(auto_now_add=True)
     fecha_apertura = models.DateTimeField(null=True, blank=True)
-
+    pausa = models.ForeignKey(PausaActiva, on_delete=models.SET_NULL, null=True, blank=True)
+    
     def __str__(self):
-          return f"Notificación {self.titulo} a {self.usuario.email}"
+        if self.usuario:
+            return f"Notificación {self.titulo} a {self.usuario.email}"
+        return f"Notificación {self.titulo} (sin usuario)"
+    
 
 
 # =========================

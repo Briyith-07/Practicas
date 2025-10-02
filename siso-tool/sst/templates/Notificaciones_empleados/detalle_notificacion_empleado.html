@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block title %}Detalle Notificación{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <h3 class="card-title">📩 {{ notificacion.titulo }}</h3>
+            <p class="card-text">{{ notificacion.mensaje }}</p>
+
+            <p><strong>Enviada el:</strong> {{ notificacion.fecha_envio|date:"d M Y H:i" }}</p>
+
+            <p><strong>Estado:</strong>
+                {% if notificacion.abierta %}
+                    <span class="badge bg-success">Leída ✅</span>
+                {% else %}
+                    <span class="badge bg-danger">No leída ❌</span>
+                {% endif %}
+            </p>
+
+            <!-- ✅ Mostrar botón ejecutar pausa si la notificación tiene una pausa -->
+          {% if notificacion.pausa %}
+    <a href="{% url 'ejecutar_pausa' notificacion.pausa.id %}" class="btn btn-success me-2">
+        ▶ Ejecutar Pausa
+    </a>
+            {% endif %}
+
+            <!-- Botón volver -->
+            <a href="{% url 'listar_notificaciones_empleado' %}" class="btn btn-primary">
+                ← Volver a mis notificaciones
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

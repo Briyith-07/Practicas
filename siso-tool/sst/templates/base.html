@@ -51,14 +51,14 @@
                     <!-- Usuario y cerrar sesión -->
                     <li class="nav-item d-flex align-items-center">
                         <i class="bi bi-person-circle me-2 text-white"></i>
-                        <a href="{% url 'editar_usuario' user.id %}" class="text-white me-3 text-decoration-none">
-                            {% if user.first_name or user.last_name %}
-                                {{ user.first_name }} {{ user.last_name }}
-                            {% else %}
-                                {{ user.email }}
-                            {% endif %}
+                        {% if user.cargo|default:"" == "empleado" %}
+                            <a href="{% url 'editar_usuario_empleado' user.id %}" class="text-white me-3 text-decoration-none">
+                        {% else %}
+                            <a href="{% url 'editar_usuario_admin' user.id %}" class="text-white me-3 text-decoration-none">
+                        {% endif %}
+                            {{ user.first_name }} {{ user.last_name }}
                         </a>
-                        <a class="nav-link text-white fw-bold" href="{% url 'logout' %}">Cerrar Sesión</a>
+                        <a href="{% url 'logout' %}" class="btn btn-link text-white p-0 m-0 align-baseline">Cerrar Sesión</a>
                     </li>
                 {% else %}
                     <li class="nav-item">
@@ -72,6 +72,18 @@
         </div>
     </div>
 </nav>
+
+<!-- BLOQUE DE MENSAJES -->
+<div class="container mt-3">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+</div>
 
 <div class="container">
     {% block content %}

@@ -1,64 +1,56 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth import get_user_model
 from django.contrib import messages
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse, FileResponse
 from django.utils.safestring import mark_safe
 from django.utils import timezone
 from django.utils.crypto import get_random_string
-from django.core.mail import send_mail, EmailMultiAlternatives
+from django.utils.timezone import localtime, now
 from django.template.loader import render_to_string
 from django.conf import settings
-from django.db.models import Count, F
-from django.contrib.auth import get_user_model
-from datetime import timedelta
-from django.db.models import Subquery, OuterRef
+from django.core.mail import send_mail, EmailMultiAlternatives
+from django.db.models import Count, F, Subquery, OuterRef, Max
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db import IntegrityError
+from django.urls import reverse
+
+
+from datetime import timedelta, date
 import random
 import string
 import json
 import io
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import xlsxwriter
+from .models import Perfil
+
 from openpyxl import Workbook
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import (
+    SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer,
+    PageBreak, Image
+)
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
-from .forms import (RegistroUsuarioForm, AdminCrearUsuarioForm, AdminEditarUsuarioForm,CampañaForm, EncuestaForm, FeedbackForm, CodigoCampañaForm)
-from .models import Usuario, Actividad, Campaña, CampanaAsignada, Feedback, CodigoCampaña
 from reportlab.graphics.shapes import Drawing
 from reportlab.graphics.charts.barcharts import VerticalBarChart
-from django.http import FileResponse
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak, Image
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet
-import matplotlib.pyplot as plt
-from django.http import HttpResponse
-from .models import Campaña, CampanaAsignada
-from reportlab.platypus import Image
-import matplotlib
-matplotlib.use('Agg') 
-from django.utils.timezone import localtime
-from .models import Usuario, Campaña
-from django.contrib.auth.models import User
-from django.http import JsonResponse
-from .forms import CampanaAsignadaForm 
-from .models import CampanaAsignada, Calificacion, Encuesta
-from django.db.models import Max
-from django.utils.timezone import now
-from django.contrib import messages
-from datetime import date 
-from .models import Grupo
-from .forms import GrupoForm
-from django.contrib import messages
-from django.core.mail import send_mail
-from django.conf import settings
-from .models import Notificacion
-from .forms import NotificacionForm
-from .forms import EditarUsuarioForm
 
+# Formularios
+from .forms import (
+    RegistroUsuarioForm, AdminCrearUsuarioForm, AdminEditarUsuarioForm,
+    CampañaForm, EncuestaForm, FeedbackForm, CodigoCampañaForm,
+    CampanaAsignadaForm, GrupoForm, NotificacionForm, EditarUsuarioForm
+)
 
+# Modelos
+from .models import (
+    Usuario, Actividad, Campaña, CampanaAsignada, Feedback, CodigoCampaña,
+    Calificacion, Encuesta, Grupo, Notificacion, PausaActiva
+)
 
 Usuario = get_user_model()
 
@@ -80,18 +72,26 @@ def login_view(request):
         usuario = authenticate(request, username=username, password=password)
         if usuario is not None:
             login(request, usuario)
-            if usuario.is_superuser:
-                return redirect('admin_dashboard')  
-            return redirect('dashboard_empleado')
+
+            # Redirige según cargo
+            if usuario.cargo == 'admin' or usuario.is_superuser:
+                return redirect('admin_dashboard')
+            elif usuario.cargo == 'empleado':
+                return redirect('dashboard_empleado')
+            else:
+                return redirect('inicio')
         else:
             messages.error(request, 'Credenciales incorrectas')
     return render(request, 'auth/login.html')
 
 
+# =====================
+# LOGOUT
+# =====================
 def logout_view(request):
     logout(request)
-    messages.success(request, 'Sesión cerrada correctamente.')
-    return redirect('inicio')
+    return redirect('inicio')  # Redirige a la página principal
+
 
 #REESTABLECER CONTRASEÑA
 def restablecer_contraseña(request, id):
@@ -226,7 +226,7 @@ def registro(request):
         form = RegistroUsuarioForm(request.POST)
         if form.is_valid():
             usuario = form.save(commit=False)
-            usuario.username = form.cleaned_data['email']  # opcional: usa el email como username
+            usuario.username = form.cleaned_data['email']  
             usuario.save()
             messages.success(request, 'Registro exitoso. Ya puedes iniciar sesión.')
             return redirect('login')
@@ -247,6 +247,7 @@ def admin_dashboard(request):
     total_usuarios = Usuario.objects.count()
     total_campañas = Campaña.objects.count()
     total_asignadas = CampanaAsignada.objects.count()
+    total_grupos = Grupo.objects.count()  
 
     asignaciones_detalle = CampanaAsignada.objects.select_related('campaña', 'empleado')
     
@@ -254,9 +255,9 @@ def admin_dashboard(request):
         'usuarios': total_usuarios,
         'campañas': total_campañas,
         'asignaciones': total_asignadas,
+        'grupos': total_grupos,  
         'asignaciones_detalle': asignaciones_detalle,
     })
-
 @user_passes_test(lambda u: u.is_superuser)
 def administrar_usuarios(request):
     usuarios = Usuario.objects.all()
@@ -268,34 +269,100 @@ def listar_usuarios(request):
     usuarios = Usuario.objects.all()
     return render(request, 'usuarios_admin/listar_usuarios.html', {'usuarios': usuarios})
 
-#crear usuarios
 @user_passes_test(lambda u: u.is_superuser)
 def crear_usuario(request):
     if request.method == 'POST':
         form = AdminCrearUsuarioForm(request.POST)
         if form.is_valid():
-            usuario = form.save(commit=False)        
-            usuario.date_joined = timezone.now()     
-            usuario.save()                        
-            messages.success(request, 'Usuario creado correctamente.')
-            return redirect('listar_usuarios')
+            try:
+                # Crear usuario
+                usuario = form.save(commit=False)
+                usuario.date_joined = timezone.now()
+                usuario.username = usuario.email
+                usuario.save()
+
+                # Crear perfil usando 'user'
+                Perfil.objects.create(
+                    user=usuario,
+                    telefono=form.cleaned_data.get('telefono'),
+                    departamento=form.cleaned_data.get('departamento'),
+                    ciudad=form.cleaned_data.get('ciudad')
+                )
+
+                messages.success(request, 'Usuario y perfil creados correctamente.')
+                return redirect('listar_usuarios')
+
+            except IntegrityError as e:
+                if 'cedula' in str(e):
+                    messages.error(request, 'Ya existe un usuario con esa cédula.')
+                elif 'email' in str(e):
+                    messages.error(request, 'Ya existe un usuario con ese correo electrónico.')
+                else:
+                    messages.error(request, 'Ocurrió un error al crear el usuario.')
+        else:
+            messages.error(request, 'Corrige los errores del formulario.')
     else:
         form = AdminCrearUsuarioForm()
+
     return render(request, 'usuarios_admin/usuarios/crear.html', {'form': form})
 
 #editar usuarios
-@user_passes_test(lambda u: u.is_superuser)
-def editar_usuario(request, usuario_id):
+def editar_usuario_empleado(request, usuario_id):
     usuario = get_object_or_404(Usuario, id=usuario_id)
+    perfil, creado = Perfil.objects.get_or_create(user=usuario)
+
+    if request.method == "POST":
+        # Campos editables
+        correo = request.POST.get("correo")
+        telefono = request.POST.get("telefono")
+        departamento = request.POST.get("departamento")
+        ciudad = request.POST.get("ciudad")
+        direccion = request.POST.get("direccion")   # ✅
+        cedula = request.POST.get("cedula")        # ✅
+
+        # Guardar en usuario
+        usuario.email = correo
+        usuario.cedula = cedula
+        usuario.direccion = direccion              # ✅ Aquí va
+        usuario.save()
+
+        # Guardar en perfil
+        perfil.telefono = telefono
+        perfil.departamento = departamento
+        perfil.ciudad = ciudad
+        perfil.save()
+
+        messages.success(request, "Perfil actualizado correctamente.")
+
+        if request.user.is_superuser or request.user.cargo == "admin":
+            return redirect("admin_dashboard")
+        else:
+            return redirect("dashboard_empleado")
+
+    cancelar_url = reverse("admin_dashboard") if request.user.is_superuser or request.user.cargo == "admin" else reverse("dashboard_empleado")
+
+    context = {
+        "usuario": usuario,
+        "perfil": perfil,
+        "cancelar_url": cancelar_url,
+    }
+
+    return render(request, "usuarios/editar_usuario_empleado.html", context)
+
+# Para administradores
+def editar_usuario_admin(request, usuario_id):
+    usuario = get_object_or_404(Usuario, id=usuario_id)
+
     if request.method == 'POST':
         form = AdminEditarUsuarioForm(request.POST, instance=usuario)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Usuario actualizado.')
+            form.save()  # guarda Usuario y Perfil automáticamente
+            messages.success(request, 'Usuario actualizado correctamente.')
             return redirect('listar_usuarios')
     else:
         form = AdminEditarUsuarioForm(instance=usuario)
-    return render(request, 'usuarios_admin/editar_usuario.html', {'form': form})
+
+    return render(request, 'usuarios_admin/editar_usuario.html', {'form': form, 'usuario': usuario})
 
 #inhabilitar usuario
 @user_passes_test(lambda u: u.is_superuser)
@@ -388,9 +455,8 @@ def crear_campaña(request):
     if request.method == 'POST':
         form = CampañaForm(request.POST, request.FILES)
         if form.is_valid():
-            campaña = form.save()  # Guardar la campaña
-            empleado = form.cleaned_data.get('empleado')  # Obtener empleado del formulario
-
+            campaña = form.save() 
+            empleado = form.cleaned_data.get('empleado')  
             if empleado:
                 CampanaAsignada.objects.create(campaña=campaña, empleado=empleado)
 
@@ -728,7 +794,7 @@ def estadisticas_campañas(request):
 @user_passes_test(lambda u: u.is_superuser)
 def listar_grupos(request):
     grupos = Grupo.objects.all()
-    return render(request, 'grupos/listar.html', {'grupos': grupos})
+    return render(request, 'Grupos/listar_grupos.html', {'grupos': grupos})
 
 @user_passes_test(lambda u: u.is_superuser)
 def crear_grupo(request):
@@ -736,11 +802,10 @@ def crear_grupo(request):
         form = GrupoForm(request.POST)
         if form.is_valid():
             form.save()
-            messages.success(request, "Grupo creado correctamente.")
-            return redirect('listar_grupos')
+            return redirect('listar_grupos') 
     else:
         form = GrupoForm()
-    return render(request, 'grupos/crear.html', {'form': form})
+    return render(request, 'grupos/crear_grupo.html', {'form': form})
 
 @user_passes_test(lambda u: u.is_superuser)
 def editar_grupo(request, id):
@@ -753,7 +818,7 @@ def editar_grupo(request, id):
             return redirect('listar_grupos')
     else:
         form = GrupoForm(instance=grupo)
-    return render(request, 'grupos/editar.html', {'form': form, 'grupo': grupo})
+    return render(request, 'grupos/editar_grupo.html', {'form': form, 'grupo': grupo})
 
 @user_passes_test(lambda u: u.is_superuser)
 def eliminar_grupo(request, id):
@@ -762,7 +827,7 @@ def eliminar_grupo(request, id):
         grupo.delete()
         messages.warning(request, "Grupo eliminado.")
         return redirect('listar_grupos')
-    return render(request, 'grupos/eliminar.html', {'grupo': grupo})
+    return render(request, 'grupos/eliminar_grupo.html', {'grupo': grupo})
 
 #pausa
 def registrar_pausa(request):
@@ -819,7 +884,7 @@ def asignar_usuario_campania(request):
         "campanias": campanias
     })
 
-#Notificaciones#
+#Notificaciones admin#
 
 def notificaciones_json(request):
     notificaciones = Notificacion.objects.filter(
@@ -846,9 +911,10 @@ def notificaciones_json(request):
 def marcar_notificacion_leida(request, pk):
     if request.method == "POST":
         notificacion = get_object_or_404(Notificacion, id=pk, usuario=request.user)
-        notificacion.abierta = True
-        notificacion.fecha_apertura = now()
-        notificacion.save()
+        if not notificacion.abierta:
+            notificacion.abierta = True
+            notificacion.fecha_apertura = timezone.now()
+            notificacion.save(update_fields=["abierta", "fecha_apertura"])
         return JsonResponse({"status": "ok"})
     return JsonResponse({"status": "error", "message": "Método no permitido"}, status=405)
 
@@ -871,19 +937,82 @@ def listar_notificaciones(request):
     notificaciones = Notificacion.objects.all().select_related("campaña", "usuario")
     return render(request, "Notificaciones/listar_notificaciones.html", {"notificaciones": notificaciones})
 
+
 def crear_notificacion(request):
     if request.method == "POST":
         form = NotificacionForm(request.POST)
         if form.is_valid():
+            notificacion = form.save(commit=False) 
+            notificacion.enviada = True           
+            notificacion.save()                   
+            messages.success(request, "✅ Notificación creada y enviada con éxito.")
+            return redirect("listar_notificaciones")
+        else:
+            messages.error(request, "❌ Error al crear la notificación. Revisa los campos.")
+    else:
+        form = NotificacionForm()
+
+    campañas = Campaña.objects.all().values('id', 'detalle', 'estado', 'periodicidad', 'multimedia', 'fecha_creacion')
+    # Convertir a lista y anteponer MEDIA_URL al campo multimedia
+    campañas_info = []
+    for c in campañas:
+        c['multimedia'] = f"{settings.MEDIA_URL}{c['multimedia']}" if c['multimedia'] else ""
+        campañas_info.append(c)
+
+    usuarios = Usuario.objects.all().values('id', 'first_name', 'last_name', 'cedula')
+
+    return render(request, 'Notificaciones/crear_notificaciones.html', {
+        'form': form,
+        'campañas_info': campañas_info,
+        'usuarios_info': list(usuarios),
+    })
+
+
+# Vista para administradores
+def detalle_notificacion_admin(request, pk):
+    # Admin puede ver cualquier notificación
+    notificacion = get_object_or_404(Notificacion, pk=pk)
+
+    return render(request, "Notificaciones/detalle_notificacion_admin.html", {
+        "notificacion": notificacion
+    })
+
+
+#editar notificaciones
+def editar_notificacion(request, pk):
+    notificacion = get_object_or_404(Notificacion, pk=pk)
+    if request.method == "POST":
+        form = NotificacionForm(request.POST, instance=notificacion)
+        if form.is_valid():
             form.save()
             return redirect("listar_notificaciones")
     else:
-        form = NotificacionForm()
-    return render(request, "Notificaciones/crear_notificaciones.html", {"form": form})
+        form = NotificacionForm(instance=notificacion)
+    return render(
+        request,
+        "Notificaciones/editar_notificaciones.html",
+        {"form": form, "notificacion": notificacion}
+    )
 
-def detalle_notificacion(request, pk):
+
+#eliminar notificaciones
+def eliminar_notificacion(request, pk):
     notificacion = get_object_or_404(Notificacion, pk=pk)
-    return render(request, "Notificaciones/detalle_notificaciones.html", {"notificacion": notificacion})
+    if request.method == "POST":
+        notificacion.delete()
+        return redirect("listar_notificaciones")
+    return render(request, "Notificaciones/eliminar_notificaciones.html", {"notificacion": notificacion})
+
+
+#notificacion empleado
+
+@login_required
+def listar_notificaciones_empleado(request):
+    notificaciones = Notificacion.objects.filter(usuario=request.user).order_by('-fecha_envio')
+    return render(request, "Notificaciones_empleados/listar_notificaciones_empleado.html", {
+        "notificaciones": notificaciones
+    })
+
 
 #---------usuario---------
 def perfil_modificar(request):
@@ -931,8 +1060,9 @@ def dashboard_empleado(request):
  
  #--------editar usuario------
  
+
 def editar_usuario(request, usuario_id):
-    usuario = get_object_or_404(User, id=usuario_id)
+    usuario = Usuario.objects.get(pk=usuario_id)
     perfil, creado = Perfil.objects.get_or_create(user=usuario)
 
     if request.method == "POST":
@@ -941,7 +1071,7 @@ def editar_usuario(request, usuario_id):
         departamento = request.POST.get("departamento")
         ciudad = request.POST.get("ciudad")
 
-        # Actualizar correo en User
+        # Actualizar correo en Usuario
         usuario.email = correo
         usuario.save()
 
@@ -1093,3 +1223,27 @@ def dar_feedback(request, asignacion_id):
 def listar_feedback(request):
     feedbacks = Feedback.objects.select_related('empleado', 'campaña').all()
     return render(request, 'feedback/listar_feedback.html', {'feedbacks': feedbacks})
+
+#pausa activa
+def ejecutar_pausa(request, pausa_id):
+    pausa = get_object_or_404(PausaActiva, pk=pausa_id)
+    return render(request, "Notificaciones_empleados/ejecutar_pausa.html", {
+        "pausa": pausa
+    })
+    
+#notificaciones
+def detalle_notificacion_empleado(request, pk):
+    notificacion = get_object_or_404(Notificacion, pk=pk, usuario=request.user)
+    if not notificacion.abierta:
+        notificacion.abierta = True
+        notificacion.fecha_apertura = timezone.now()
+        notificacion.save(update_fields=["abierta", "fecha_apertura"])
+    if not notificacion.pausa:
+        pausa = PausaActiva.objects.first()  
+        if pausa:
+            notificacion.pausa = pausa
+            notificacion.save(update_fields=["pausa"])
+    return render(request, "notificaciones_empleados/detalle_notificacion_empleado.html", {
+        "notificacion": notificacion
+    })
+    

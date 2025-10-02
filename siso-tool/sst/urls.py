@@ -14,6 +14,8 @@ urlpatterns = [
     path('registro/', views.registro, name='registro'),
     path('logout/', views.logout_view, name='logout'),
 
+
+
     # Actividades generales SG-SST
     path('actividades/', views.lista_actividades, name='lista_actividades'),
 
@@ -26,7 +28,13 @@ urlpatterns = [
     # CRUD de usuarios (ADMIN)
     path('usuarios/', views.listar_usuarios, name='listar_usuarios'),
     path('usuarios/crear/', views.crear_usuario_admin, name='crear_usuario'),
-    path('usuarios/editar/<int:usuario_id>/', views.editar_usuario, name='editar_usuario'),
+   
+   # Empleado
+    path('usuario/editar/<int:usuario_id>/', views.editar_usuario_empleado, name='editar_usuario_empleado'),
+
+# Admin
+    path('panel/usuarios/editar/<int:usuario_id>/', views.editar_usuario_admin, name='editar_usuario_admin'),
+
     path('usuarios/inhabilitar/<int:usuario_id>/', views.inhabilitar_usuario, name='inhabilitar_usuario'),
     path('usuarios/habilitar/<int:usuario_id>/', views.habilitar_usuario, name='habilitar_usuario'),    
 
@@ -86,16 +94,28 @@ urlpatterns = [
     # Notificaciones
     path('listar/', views.listar_notificaciones, name='listar_notificaciones'),
     path("crear/", views.crear_notificacion, name="crear_notificacion"),
-    path("<int:pk>/", views.detalle_notificacion, name="detalle_notificacion"),
     path("notificaciones/json/", views.notificaciones_json, name="notificaciones_json"),
     path("notificaciones/leida/<int:pk>/", views.marcar_notificacion_leida, name="marcar_notificacion_leida"),
     path("api/notificaciones/", views.api_notificaciones, name="api_notificaciones"),
+    path("editar/<int:pk>/", views.editar_notificacion, name="editar_notificacion"),
+    path("eliminar/<int:pk>/", views.eliminar_notificacion, name="eliminar_notificacion"),
+    path("detalle-admin/<int:pk>/", views.detalle_notificacion_admin, name="detalle_notificacion_admin"),
+    path('pausa/<int:pausa_id>/ejecutar/', views.ejecutar_pausa, name='ejecutar_pausa'),
+  
+    
     
     #usuario
     path('perfil/modificar/', views.perfil_modificar, name='perfil_modificar'),
-    path("usuarios/editar/<int:id>/", views.editar_usuario, name="editar_usuario")
-
-
+   
+    #notificaciones empleado
+    path("listar/empleado/", views.listar_notificaciones_empleado, name="listar_notificaciones_empleado"),
+    path("notificacion/<int:pk>/", views.detalle_notificacion_empleado, name="detalle_notificacion_empleado"),
+    
+    #grupos
+    path('grupos/', views.listar_grupos, name='listar_grupos'),
+    path('grupos/crear/', views.crear_grupo, name='crear_grupo'),
+    path('grupos/editar/<int:id>/', views.editar_grupo, name='editar_grupo'),
+    path('grupos/eliminar/<int:id>/', views.eliminar_grupo, name='eliminar_grupo'),
 
 ]
 if settings.DEBUG:

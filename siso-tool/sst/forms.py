@@ -4,7 +4,8 @@ from django.contrib.auth import get_user_model
 from .models import Campaña, Encuesta, Feedback, CodigoCampaña, CampanaAsignada  
 from .models import Grupo
 from .models import Notificacion
-from .models import Usuario
+from .models import Usuario, Perfil
+
 
 
 
@@ -26,27 +27,30 @@ TODAS_CIUDADES = [('', 'Seleccione una ciudad')] + [(ciudad, ciudad) for ciudade
 # -----------------------
 
 class RegistroUsuarioForm(UserCreationForm):
+    cedula = forms.CharField(widget=forms.TextInput(attrs={'class': 'form-control','placeholder': 'Cédula' }))
     first_name = forms.CharField(widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nombre'}))
     last_name = forms.CharField(widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Apellidos'}))
     telefono = forms.CharField(widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Celular'}))
-    departamento = forms.ChoiceField(
-        choices=DEPARTAMENTOS,
-        widget=forms.Select(attrs={'class': 'form-control', 'id': 'id_departamento'})
-    )
-    ciudad = forms.ChoiceField(
-        choices=TODAS_CIUDADES,
-        widget=forms.Select(attrs={'class': 'form-control', 'id': 'id_ciudad', 'disabled': 'disabled'})
-    )
+    departamento = forms.ChoiceField(choices=DEPARTAMENTOS, widget=forms.Select(attrs={'class': 'form-control', 'id': 'id_departamento'}))
+    ciudad = forms.ChoiceField(choices=TODAS_CIUDADES, widget=forms.Select(attrs={'class': 'form-control', 'id': 'id_ciudad', 'disabled': 'disabled'}))
     direccion = forms.CharField(widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Dirección'}))
     email = forms.EmailField(widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Correo electrónico'}))
-    password1 = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-control','placeholder': 'Contraseña','autocomplete': 'new-password'}))
-    password2 = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-control','placeholder': 'Confirmar contraseña','autocomplete': 'new-password'}))
+    password1 = forms.CharField(widget=forms.PasswordInput(attrs={
+        'class': 'form-control',
+        'placeholder': 'Contraseña',
+        'autocomplete': 'new-password'
+    }))
+    password2 = forms.CharField(widget=forms.PasswordInput(attrs={
+        'class': 'form-control',
+        'placeholder': 'Confirmar contraseña',
+        'autocomplete': 'new-password'
+    }))
     terminos = forms.BooleanField(required=True)
 
     class Meta:
         model = Usuario
         fields = [
-            'first_name', 'last_name', 'telefono',
+            'cedula', 'first_name', 'last_name', 'telefono',
             'departamento', 'ciudad', 'direccion',
             'email', 'password1', 'password2'
         ]
@@ -56,11 +60,14 @@ class RegistroUsuarioForm(UserCreationForm):
 # -----------------------
 
 class AdminCrearUsuarioForm(UserCreationForm):
+    cedula = forms.CharField(label='Cédula', widget=forms.TextInput(attrs={'class': 'form-control'}))
     first_name = forms.CharField(label='Nombre', widget=forms.TextInput(attrs={'class': 'form-control'}))
     last_name = forms.CharField(label='Apellidos', widget=forms.TextInput(attrs={'class': 'form-control'}))
     telefono = forms.CharField(label='Celular', widget=forms.TextInput(attrs={'class': 'form-control'}))
-    departamento = forms.ChoiceField(label='Departamento', choices=DEPARTAMENTOS, widget=forms.Select(attrs={'class': 'form-control', 'id': 'id_departamento'}))
-    ciudad = forms.ChoiceField(label='Ciudad', choices=TODAS_CIUDADES, widget=forms.Select(attrs={'class': 'form-control', 'id': 'id_ciudad'}))
+    departamento = forms.ChoiceField(label='Departamento', choices=DEPARTAMENTOS,
+                                     widget=forms.Select(attrs={'class': 'form-control', 'id': 'id_departamento'}))
+    ciudad = forms.ChoiceField(label='Ciudad', choices=TODAS_CIUDADES,
+                               widget=forms.Select(attrs={'class': 'form-control', 'id': 'id_ciudad'}))
     direccion = forms.CharField(label='Dirección', widget=forms.TextInput(attrs={'class': 'form-control'}))
     email = forms.EmailField(label='Correo', widget=forms.EmailInput(attrs={'class': 'form-control'}))
     cargo = forms.ChoiceField(label='Rol', choices=Usuario.ROLES, widget=forms.Select(attrs={'class': 'form-control'}))
@@ -69,16 +76,27 @@ class AdminCrearUsuarioForm(UserCreationForm):
 
     class Meta:
         model = Usuario
-        fields = ['first_name', 'last_name', 'telefono', 'departamento', 'ciudad', 'direccion', 'email', 'cargo', 'password1', 'password2']
+        fields = ['cedula', 'first_name', 'last_name', 'telefono', 'departamento',
+                  'ciudad', 'direccion', 'email', 'cargo', 'password1', 'password2']
 
     def save(self, commit=True):
         usuario = super().save(commit=False)
         usuario.username = self.cleaned_data['email']
+        usuario.email = self.cleaned_data['email']
+        usuario.cedula = self.cleaned_data['cedula']
         usuario.cargo = self.cleaned_data['cargo']
+
         if commit:
             usuario.save()
-        return usuario
+            # Crear o actualizar el perfil
+            perfil, created = Perfil.objects.get_or_create(user=usuario)
+            perfil.telefono = self.cleaned_data['telefono']
+            perfil.departamento = self.cleaned_data['departamento']
+            perfil.ciudad = self.cleaned_data['ciudad']
+            perfil.direccion = self.cleaned_data['direccion']
+            perfil.save()
 
+        return usuario
 # -----------------------
 # Editar Usuario Admin
 # -----------------------
@@ -203,17 +221,65 @@ class FeedbackForm(forms.ModelForm):
             'calificacion': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'max': 5}),
             'comentarios': forms.Textarea(attrs={'class': 'form-control'}),
         }
-
+#grupos
 class GrupoForm(forms.ModelForm):
+    usuarios = forms.ModelMultipleChoiceField(
+        queryset=Usuario.objects.all(),
+        widget=forms.CheckboxSelectMultiple,
+        required=False,  # Usuarios opcional
+        label="Asignar usuarios al grupo"
+    )
+
     class Meta:
         model = Grupo
-        fields = ["nombre", "descripcion"]
+        fields = ['nombre', 'descripcion', 'usuarios']
+        widgets = {
+            'nombre': forms.TextInput(attrs={'class': 'form-control'}),
+            'descripcion': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
 
-
+    def clean(self):
+        cleaned_data = super().clean()
+        # Validar solo los campos obligatorios
+        if not cleaned_data.get('nombre'):
+            self.add_error('nombre', 'Este campo es obligatorio.')
+        if not cleaned_data.get('descripcion'):
+            self.add_error('descripcion', 'Este campo es obligatorio.')
+        return cleaned_data
+#----------------------------------------------------#
 class NotificacionForm(forms.ModelForm):
+    campaña = forms.ModelChoiceField(
+        queryset=Campaña.objects.all(),
+        empty_label="Seleccione una campaña",
+        widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_campaña'})
+    )
+    usuario = forms.ModelChoiceField(
+        queryset=Usuario.objects.filter(is_active=True, cargo="empleado"),
+        empty_label="Seleccione un usuario",
+        widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_usuario'})
+)
+
     class Meta:
         model = Notificacion
-        fields = ['campaña', 'usuario', 'titulo', 'mensaje', 'tipo']
+        fields = ['campaña', 'usuario', 'cedula', 'titulo', 'mensaje', 'tipo']
+        widgets = {
+            'cedula': forms.TextInput(attrs={'readonly': 'readonly', 'id': 'id_cedula'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        usuario = getattr(getattr(self, 'instance', None), 'usuario', None)
+        if usuario:
+            self.fields['cedula'].initial = usuario.cedula
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        if instance.usuario:
+            instance.cedula = instance.usuario.cedula
+        if commit:
+            instance.save()
+        return instance
 
 class EditarUsuarioForm(forms.ModelForm):
     password = forms.CharField(
@@ -233,3 +299,34 @@ class EditarUsuarioForm(forms.ModelForm):
         if commit:
             user.save()
         return user
+
+class AdminEditarUsuarioForm(forms.ModelForm):
+    telefono = forms.CharField(required=False)
+    direccion = forms.CharField(required=False)   
+    departamento = forms.CharField(required=False)
+    ciudad = forms.CharField(required=False)
+    cedula = forms.CharField(required=False)      
+
+    class Meta:
+        model = Usuario
+        fields = ['first_name', 'last_name', 'email', 'cargo']  
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and hasattr(self.instance, 'perfil'):
+            self.fields['telefono'].initial = self.instance.perfil.telefono
+            self.fields['direccion'].initial = self.instance.perfil.direccion
+            self.fields['departamento'].initial = self.instance.perfil.departamento
+            self.fields['ciudad'].initial = self.instance.perfil.ciudad
+            self.fields['cedula'].initial = self.instance.perfil.cedula
+
+    def save(self, commit=True):
+        usuario = super().save(commit)
+        perfil, created = Perfil.objects.get_or_create(user=usuario)
+        perfil.telefono = self.cleaned_data['telefono']
+        perfil.direccion = self.cleaned_data['direccion']
+        perfil.departamento = self.cleaned_data['departamento']
+        perfil.ciudad = self.cleaned_data['ciudad']
+        perfil.cedula = self.cleaned_data['cedula']
+        perfil.save()
+        return usuario

@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="card shadow p-4">
+        <h2 class="mb-4">Editar Usuario</h2>
+        <form method="post">
+            {% csrf_token %}
+
+            <!-- Nombre -->
+            <div class="mb-3">
+                <label class="form-label">Nombre</label>
+                <input type="text" name="first_name" value="{{ form.first_name.value|default:usuario.first_name }}" class="form-control">
+            </div>
+
+            <!-- Apellido -->
+            <div class="mb-3">
+                <label class="form-label">Apellido</label>
+                <input type="text" name="last_name" value="{{ form.last_name.value|default:usuario.last_name }}" class="form-control">
+            </div>
+
+            <!-- Cédula -->
+            <div class="mb-3">
+                <label class="form-label">Cédula</label>
+                <input type="text" name="cedula" value="{{ form.cedula.value|default:usuario.cedula }}" class="form-control">
+            </div>
+
+            <!-- Teléfono -->
+            <div class="mb-3">
+                <label class="form-label">Teléfono</label>
+                <input type="text" name="telefono" value="{{ form.telefono.value|default:usuario.perfil.telefono }}" class="form-control">
+            </div>
+
+            <!-- Correo -->
+            <div class="mb-3">
+                <label class="form-label">Correo</label>
+                <input type="email" name="email" value="{{ form.email.value|default:usuario.email }}" class="form-control">
+            </div>
+
+            <!-- Dirección -->
+            <div class="mb-3">
+                <label class="form-label">Dirección</label>
+                <input type="text" name="direccion" value="{{ usuario.perfil.direccion }}" class="form-control">
+            </div>
+
+            <!-- Departamento -->
+            <div class="mb-3">
+                <label class="form-label">Departamento</label>
+                <select name="departamento" id="departamento" class="form-select">
+                    <option value="">Seleccione un departamento</option>
+                    <option value="Cundinamarca" {% if form.departamento.value == "Cundinamarca" or usuario.perfil.departamento == "Cundinamarca" %}selected{% endif %}>Cundinamarca</option>
+                    <option value="Antioquia" {% if form.departamento.value == "Antioquia" or usuario.perfil.departamento == "Antioquia" %}selected{% endif %}>Antioquia</option>
+                    <option value="Valle del Cauca" {% if form.departamento.value == "Valle del Cauca" or usuario.perfil.departamento == "Valle del Cauca" %}selected{% endif %}>Valle del Cauca</option>
+                    <option value="Bogotá" {% if form.departamento.value == "Bogotá" or usuario.perfil.departamento == "Bogotá" %}selected{% endif %}>Bogotá</option>
+                </select>
+            </div>
+
+            <!-- Ciudad -->
+            <div class="mb-3">
+                <label class="form-label">Ciudad</label>
+                <select name="ciudad" id="ciudad" class="form-select">
+                    <option value="">Seleccione una ciudad</option>
+                </select>
+            </div>
+
+            <!-- Rol -->
+            <div class="mb-3">
+                <label class="form-label">Rol</label>
+                <select name="cargo" class="form-select">
+                    <option value="admin" {% if form.cargo.value == "admin" or usuario.cargo == "admin" %}selected{% endif %}>Administrador</option>
+                    <option value="empleado" {% if form.cargo.value == "empleado" or usuario.cargo == "empleado" %}selected{% endif %}>Empleado</option>
+                </select>
+            </div>
+
+            <!-- Botones -->
+            <button type="submit" class="btn btn-primary">Guardar</button>
+            <a href="{% url 'listar_usuarios' %}" class="btn btn-secondary">Cancelar</a>
+        </form>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const departamentoSelect = document.getElementById("departamento");
+    const ciudadSelect = document.getElementById("ciudad");
+
+    const ciudadesPorDepartamento = {
+        "Cundinamarca": ["Girardot", "Soacha", "Fusagasugá", "Zipaquirá", "Ricaurte"],
+        "Antioquia": ["Medellín", "Envigado", "Bello", "Itagüí"],
+        "Valle del Cauca": ["Cali", "Palmira", "Buenaventura", "Tuluá"],
+        "Bogotá": ["Bogotá"]
+    };
+
+    function actualizarCiudades() {
+        const deptSeleccionado = departamentoSelect.value;
+        ciudadSelect.innerHTML = '';
+
+        if (ciudadesPorDepartamento[deptSeleccionado]) {
+            ciudadSelect.disabled = false;
+            ciudadSelect.appendChild(new Option("Seleccione una ciudad", ""));
+            ciudadesPorDepartamento[deptSeleccionado].forEach(function (ciudad) {
+                const opt = new Option(ciudad, ciudad);
+                if (ciudad === "{{ form.ciudad.value|default:usuario.perfil.ciudad }}") {
+                    opt.selected = true;
+                }
+                ciudadSelect.appendChild(opt);
+            });
+        } else {
+            ciudadSelect.disabled = true;
+            ciudadSelect.appendChild(new Option("Seleccione una ciudad", ""));
+        }
+    }
+
+    departamentoSelect.addEventListener("change", actualizarCiudades);
+    actualizarCiudades(); // inicializa las ciudades al cargar
+});
+</script>
+{% endblock %}
