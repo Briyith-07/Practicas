@@ -15,6 +15,14 @@ from django.db.models import Count, F, Subquery, OuterRef, Max
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import IntegrityError
 from django.urls import reverse
+from django.db.models import OuterRef, Subquery, Value, CharField
+from django.db.models.functions import Coalesce
+from .forms import RegistrarEvidenciaCampañaForm
+from .models import Campaña, EvidenciaCampaña
+
+
+
+
 
 
 from datetime import timedelta, date
@@ -317,13 +325,13 @@ def editar_usuario_empleado(request, usuario_id):
         telefono = request.POST.get("telefono")
         departamento = request.POST.get("departamento")
         ciudad = request.POST.get("ciudad")
-        direccion = request.POST.get("direccion")   # ✅
-        cedula = request.POST.get("cedula")        # ✅
+        direccion = request.POST.get("direccion")   
+        cedula = request.POST.get("cedula")        
 
         # Guardar en usuario
         usuario.email = correo
         usuario.cedula = cedula
-        usuario.direccion = direccion              # ✅ Aquí va
+        usuario.direccion = direccion              
         usuario.save()
 
         # Guardar en perfil
@@ -449,52 +457,96 @@ def exportar_usuarios_pdf(request):
 
     return response
 
-
-@user_passes_test(lambda u: u.is_superuser)
 def crear_campaña(request):
     if request.method == 'POST':
         form = CampañaForm(request.POST, request.FILES)
         if form.is_valid():
-            campaña = form.save() 
-            empleado = form.cleaned_data.get('empleado')  
+            campaña = form.save(commit=False)
+            campaña.save()
+
+            # Obtener datos del formulario
+            empleado = form.cleaned_data.get('empleado')
+            grupo = form.cleaned_data.get('grupos')  # 👈 es un solo grupo, no iterable
+
+            # Asignar al empleado individual si se seleccionó
             if empleado:
                 CampanaAsignada.objects.create(campaña=campaña, empleado=empleado)
 
+            # Asignar a todos los empleados del grupo seleccionado
+            if grupo:
+                campaña.grupos.add(grupo)  # 👈 usar .add() porque es solo uno
+
+                empleados = Usuario.objects.filter(grupos=grupo, cargo='empleado')
+                for empleado in empleados:
+                    CampanaAsignada.objects.create(campaña=campaña, empleado=empleado)
+
+            messages.success(request, "Campaña creada correctamente.")
             return redirect('listar_campañas')
+        else:
+            messages.error(request, "Por favor corrija los errores en el formulario.")
     else:
         form = CampañaForm()
 
-    return render(request, 'campañas/crear_campaña.html', {
-        'form': form
-    })
-    
-#listar campañas
-def listar_campañas(request):
-    asignacion = CampanaAsignada.objects.filter(campaña=OuterRef('pk')).select_related('empleado')
+    return render(request, 'campañas/crear_campaña.html', {'form': form})
 
+#listar campañas
+
+@user_passes_test(lambda u: u.is_superuser)
+def listar_campañas(request):
+    # Subquery para obtener el primer empleado asignado
+    asignacion_empleado = CampanaAsignada.objects.filter(
+        campaña=OuterRef('pk')
+    ).select_related('empleado')
+
+    # Subquery correcta para obtener el primer grupo asociado
+    grupo_subquery = Grupo.objects.filter(
+        campañas=OuterRef('pk')
+    ).values('nombre')[:1]
+
+    # Anotamos ambos valores
     campañas = Campaña.objects.annotate(
-        empleado_nombre=Subquery(asignacion.values('empleado__first_name')[:1]),
-        empleado_apellido=Subquery(asignacion.values('empleado__last_name')[:1])
+        empleado_nombre=Subquery(asignacion_empleado.values('empleado__first_name')[:1]),
+        empleado_apellido=Subquery(asignacion_empleado.values('empleado__last_name')[:1]),
+        grupo_nombre=Subquery(grupo_subquery),
+        asignado_a=Coalesce(
+            Subquery(grupo_subquery, output_field=CharField()),
+            Subquery(asignacion_empleado.values('empleado__first_name')[:1]),
+            Value('No asignado'),
+            output_field=CharField()
+        )
     )
 
     return render(request, 'campañas/listar_campañas.html', {'campañas': campañas})
 
+
 #editar campaña
-def editar_campaña(request, id):
-    campaña = get_object_or_404(Campaña, id=id)
+def editar_campaña(request, campaña_id):
+    campaña = get_object_or_404(Campaña, id=campaña_id)
 
     if request.method == 'POST':
         form = CampañaForm(request.POST, request.FILES, instance=campaña)
+        
         if form.is_valid():
-            form.save()
+            campaña = form.save(commit=False)
+            campaña.save()
+
+            # 🔹 Guardar relaciones ManyToMany correctamente
+            if 'usuarios' in form.cleaned_data:
+                campaña.usuarios.set(form.cleaned_data['usuarios'])
+
+            grupo_seleccionado = form.cleaned_data.get('grupos')
+            if grupo_seleccionado:
+                campaña.grupos.set([grupo_seleccionado])  # pasa una lista
+            else:
+                campaña.grupos.clear()
+
+            messages.success(request, "Campaña actualizada correctamente.")
             return redirect('listar_campañas')
     else:
         form = CampañaForm(instance=campaña)
 
-    return render(request, 'campañas/editar_campaña.html', {
-        'form': form,
-        'campaña': campaña
-    })
+    return render(request, 'campañas/editar_campaña.html', {'form': form, 'campaña': campaña})
+
 
 # Eliminar campaña
 def eliminar_campaña(request, id):
@@ -746,7 +798,7 @@ def campanias_asignadas(request):
 
     resumen = (
         asignadas
-        .values(nombre=F('campaña__codigo__nombre'))
+        .values(nombre=F('campaña__nombre'))  # <--- corregido
         .annotate(cantidad=Count('id'))
         .order_by('-cantidad')
     )
@@ -829,63 +881,8 @@ def eliminar_grupo(request, id):
         return redirect('listar_grupos')
     return render(request, 'grupos/eliminar_grupo.html', {'grupo': grupo})
 
-#pausa
-def registrar_pausa(request):
-    return render(request, "registrar_pausa.html")
-
-# === ASIGNACIÓN DE CAMPAÑAS ===
-@user_passes_test(lambda u: u.is_superuser)
-def asignar_campaña(request):
-    if request.method == 'POST':
-        form = CampanaAsignadaForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Campaña asignada correctamente.")
-            return redirect('listar_asignaciones')
-    else:
-        form = CampanaAsignadaForm()
-    return render(request, 'asignaciones/asignar.html', {'form': form})
-
-@user_passes_test(lambda u: u.is_superuser)
-def listar_asignaciones(request):
-    asignaciones = CampanaAsignada.objects.select_related('campaña', 'empleado')
-    return render(request, 'asignaciones/listar.html', {'asignaciones': asignaciones})
-
-@user_passes_test(lambda u: u.is_superuser)
-def eliminar_asignacion(request, id):
-    asignacion = get_object_or_404(CampanaAsignada, id=id)
-    if request.method == 'POST':
-        asignacion.delete()
-        messages.warning(request, "Asignación eliminada.")
-        return redirect('listar_asignaciones')
-    return render(request, 'asignaciones/eliminar.html', {'asignacion': asignacion})
-
-def asignar_usuario_campania(request):
-    usuarios = Usuario.objects.all()
-    campanias = Campaña.objects.all()
-
-    if request.method == "POST":
-        usuario_id = request.POST.get("usuario_id")
-        campania_id = request.POST.get("campania_id")
-
-        usuario = get_object_or_404(Usuario, id=usuario_id)
-        campania = get_object_or_404(Campaña, id=campania_id)
-
-        CampanaAsignada.objects.get_or_create(
-            campaña=campania,
-            empleado=usuario
-        )
-
-        messages.success(request, f"Usuario {usuario.first_name} asignado a campaña {campania.nombre}")
-        return redirect("asignar_usuario_campania")
-
-    return render(request, "asignaciones/asignar.html", {
-        "usuarios": usuarios,
-        "campanias": campanias
-    })
 
 #Notificaciones admin#
-
 def notificaciones_json(request):
     notificaciones = Notificacion.objects.filter(
         usuario=request.user,
@@ -953,7 +950,6 @@ def crear_notificacion(request):
         form = NotificacionForm()
 
     campañas = Campaña.objects.all().values('id', 'detalle', 'estado', 'periodicidad', 'multimedia', 'fecha_creacion')
-    # Convertir a lista y anteponer MEDIA_URL al campo multimedia
     campañas_info = []
     for c in campañas:
         c['multimedia'] = f"{settings.MEDIA_URL}{c['multimedia']}" if c['multimedia'] else ""
@@ -1028,7 +1024,28 @@ def perfil_modificar(request):
     
     return redirect('dashboard_empleado')
 
-  
+def campanas_admin(request):
+    asignadas = CampanaAsignada.objects.select_related('campaña', 'empleado')
+
+    # Procesar el estado actual de cada asignación, igual que en la vista del empleado
+    for a in asignadas:
+        evidencia = EvidenciaCampaña.objects.filter(campaña=a.campaña, empleado=a.empleado).first()
+        if evidencia:
+            if a.campaña.estado == 'por_aprobacion':
+                a.estado_actual = 'En revisión'
+            elif a.campaña.estado == 'finalizada':
+                a.estado_actual = 'Finalizada'
+            else:
+                a.estado_actual = a.campaña.estado
+        else:
+            a.estado_actual = a.campaña.estado
+
+    return render(request, 'campanas_admin/campanas_admin.html', {'asignadas': asignadas})
+
+
+
+
+ 
 # ========= VISTAS EMPLEADO =========
 
 @login_required
@@ -1088,12 +1105,138 @@ def editar_usuario(request, usuario_id):
         "perfil": perfil
     })
 
+#registro pausas empleado
+def registrar_pausa(request, campana_id):
+    campaña = get_object_or_404(Campaña, id=campana_id)
+    evidencia_existente = EvidenciaCampaña.objects.filter(
+        campaña=campaña, empleado=request.user
+    ).first()
 
-#-------------#-------------------#------------------------
+    if request.method == 'POST':
+        form = RegistrarEvidenciaCampañaForm(request.POST, request.FILES)
+        if form.is_valid():
+            evidencia = form.save(commit=False)
+            evidencia.campaña = campaña
+            evidencia.empleado = request.user
+            evidencia.save()
+
+            # ✅ Al subir evidencia, el estado pasa a "por_aprobacion"
+            campaña.estado = 'por_aprobacion'
+            campaña.save()
+
+            messages.success(request, "Evidencia registrada. Esperando aprobación del administrador.")
+            return redirect('campanas_asignadas')
+
+    else:
+        # ✅ Si el empleado solo entra a ver la campaña sin subir evidencia
+        if campaña.estado == 'activa':
+            campaña.estado = 'pausada'
+            campaña.save()
+
+        form = RegistrarEvidenciaCampañaForm()
+
+    context = {
+        'campaña': campaña,
+        'form': form,
+        'evidencia': evidencia_existente,
+    }
+    return render(request, 'empleados/registrar_evidencia_campaña.html', context)
+
+@login_required
+def campanias_realizadas_empleado(request):
+    evidencias = EvidenciaCampaña.objects.filter(
+        empleado=request.user
+    ).select_related('campaña', 'campaña__codigo')
+
+    return render(request, 'estadisticas_empleados/campanias_realizadas_empleados.html', {
+        'evidencias': evidencias
+    })
+    
+def detalle_campania_realizada(request, campana_id):
+    campaña = get_object_or_404(Campaña, id=campana_id)
+    evidencia = EvidenciaCampaña.objects.filter(campaña=campaña, empleado=request.user).first()
+
+    if evidencia:
+        estado_actual = "finalizada"
+    else:
+        estado_actual = campaña.estado  
+
+    context = {
+        'campaña': campaña,
+        'evidencia': evidencia,
+        'estado_actual': estado_actual,
+    }
+    return render(request, 'estadisticas_empleados/detalle_campania_realizada.html', context)
+   
+# === ASIGNACIÓN DE CAMPAÑAS ===
+@user_passes_test(lambda u: u.is_superuser)
+def asignar_campaña(request):
+    if request.method == 'POST':
+        form = CampanaAsignadaForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Campaña asignada correctamente.")
+            return redirect('listar_asignaciones')
+    else:
+        form = CampanaAsignadaForm()
+    return render(request, 'asignaciones/asignar.html', {'form': form})
+
+@user_passes_test(lambda u: u.is_superuser)
+def listar_asignaciones(request):
+    asignaciones = CampanaAsignada.objects.select_related('campaña', 'empleado')
+    return render(request, 'asignaciones/listar.html', {'asignaciones': asignaciones})
+
+@user_passes_test(lambda u: u.is_superuser)
+def eliminar_asignacion(request, id):
+    asignacion = get_object_or_404(CampanaAsignada, id=id)
+    if request.method == 'POST':
+        asignacion.delete()
+        messages.warning(request, "Asignación eliminada.")
+        return redirect('listar_asignaciones')
+    return render(request, 'asignaciones/eliminar.html', {'asignacion': asignacion})
+
+def asignar_usuario_campania(request):
+    usuarios = Usuario.objects.all()
+    campanias = Campaña.objects.all()
+
+    if request.method == "POST":
+        usuario_id = request.POST.get("usuario_id")
+        campania_id = request.POST.get("campania_id")
+
+        usuario = get_object_or_404(Usuario, id=usuario_id)
+        campania = get_object_or_404(Campaña, id=campania_id)
+
+        CampanaAsignada.objects.get_or_create(
+            campaña=campania,
+            empleado=usuario
+        )
+
+        messages.success(request, f"Usuario {usuario.first_name} asignado a campaña {campania.nombre}")
+        return redirect("asignar_usuario_campania")
+
+    return render(request, "asignaciones/asignar.html", {
+        "usuarios": usuarios,
+        "campanias": campanias
+    })
 @login_required
 def campanas_asignadas(request):
-    asignadas = CampanaAsignada.objects.filter(empleado=request.user)
+    asignadas = CampanaAsignada.objects.filter(empleado=request.user).select_related('campaña')
+
+    for a in asignadas:
+        evidencia = EvidenciaCampaña.objects.filter(campaña=a.campaña, empleado=request.user).first()
+        if evidencia:
+            # Si tiene evidencia pero aún no ha sido aprobada
+            if a.campaña.estado == 'por_aprobacion':
+                a.estado_actual = 'En revisión'
+            elif a.campaña.estado == 'finalizada':
+                a.estado_actual = 'Finalizada'
+            else:
+                a.estado_actual = a.campaña.estado
+        else:
+            a.estado_actual = a.campaña.estado
+
     return render(request, 'empleados/campanas_asignadas.html', {'asignadas': asignadas})
+
 
 @login_required
 def realizar_campana(request):
@@ -1102,22 +1245,43 @@ def realizar_campana(request):
         return redirect('dashboard_empleado')
     return render(request, 'empleados/realizar_campana.html')
 
+#evidencia campaña
+def registrar_evidencia_campaña(request, campaña_id):
+    campaña = get_object_or_404(Campaña, id=campaña_id)
 
-
-
-@login_required
-def subir_evidencia(request):
     if request.method == 'POST':
-        evidencia = request.FILES.get('evidencia')
-        # Aquí puedes crear una Encuesta o Registro con evidencia
-        Encuesta.objects.create(
-            empleado=request.user,
-            evidencia=evidencia,
-            respuestas="Evidencia sin encuesta",
-            fecha=timezone.now()
-        )
-        return redirect('dashboard_empleado')
-    return redirect('dashboard_empleado')
+        form = RegistrarEvidenciaCampañaForm(request.POST, request.FILES)
+        if form.is_valid():
+            evidencia = form.save(commit=False)
+            evidencia.empleado = request.user
+            evidencia.campaña = campaña
+            evidencia.save()
+            return redirect('mis_campañas')  # Ajusta según tu URL
+    else:
+        form = RegistrarEvidenciaCampañaForm()
+
+    return render(request, 'registrar_evidencia_campaña.html', {
+        'campaña': campaña,
+        'form': form
+    })
+
+#notificaciones
+def detalle_notificacion_empleado(request, pk):
+    notificacion = get_object_or_404(Notificacion, pk=pk, usuario=request.user)
+    if not notificacion.abierta:
+        notificacion.abierta = True
+        notificacion.fecha_apertura = timezone.now()
+        notificacion.save(update_fields=["abierta", "fecha_apertura"])
+    if not notificacion.pausa:
+        pausa = PausaActiva.objects.first()  
+        if pausa:
+            notificacion.pausa = pausa
+            notificacion.save(update_fields=["pausa"])
+    return render(request, "notificaciones_empleados/detalle_notificacion_empleado.html", {
+        "notificacion": notificacion
+    })
+
+
 
 def campanas_participadas(request):
     participadas = Campaña.objects.filter(participantes=request.user)
@@ -1126,9 +1290,6 @@ def campanas_participadas(request):
 def feedback_empleado(request):
     calificaciones = Feedback.objects.filter(empleado=request.user)
     return render(request, 'empleados/feedback.html', {'calificaciones': calificaciones})
-
-
-
 
 @login_required
 def encuesta_campaña(request, campaña_id):
@@ -1231,19 +1392,4 @@ def ejecutar_pausa(request, pausa_id):
         "pausa": pausa
     })
     
-#notificaciones
-def detalle_notificacion_empleado(request, pk):
-    notificacion = get_object_or_404(Notificacion, pk=pk, usuario=request.user)
-    if not notificacion.abierta:
-        notificacion.abierta = True
-        notificacion.fecha_apertura = timezone.now()
-        notificacion.save(update_fields=["abierta", "fecha_apertura"])
-    if not notificacion.pausa:
-        pausa = PausaActiva.objects.first()  
-        if pausa:
-            notificacion.pausa = pausa
-            notificacion.save(update_fields=["pausa"])
-    return render(request, "notificaciones_empleados/detalle_notificacion_empleado.html", {
-        "notificacion": notificacion
-    })
-    
+

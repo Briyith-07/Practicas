@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}Campañas Asignadas{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <!-- Botón de volver -->
+  <a href="{% url 'admin_dashboard' %}" class="btn btn-secondary mb-3">
+    <i class="bi bi-arrow-left-circle"></i> Volver al Panel de Administración
+  </a>
+
+  <h2 class="text-center mb-4">Campañas Asignadas</h2>
+
+  {% if asignadas %}
+  <table class="table table-bordered table-striped">
+    <thead class="table-dark">
+      <tr>
+        <th>Código</th>
+        <th>Campaña</th>
+        <th>Empleado</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in asignadas %}
+      <tr>
+        <td>{{ a.id }}</td>
+        <td>{{ a.campaña.nombre }}</td>
+        <td>{{ a.empleado.nombre }} {{ a.empleado.apellido }}</td>
+        <td>{{ a.estado_actual }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-center text-muted">No hay campañas asignadas actualmente.</p>
+  {% endif %}
+</div>
+{% endblock %}

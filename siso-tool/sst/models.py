@@ -128,32 +128,77 @@ class CodigoCampaña(models.Model):
 
 class Campaña(models.Model):
     ESTADOS = [
-        ('activa', 'Activa'),
-        ('pausada', 'Pausada'),
-        ('finalizada', 'Finalizada'),
+        ('activa', 'Activa'),              # Cuando se asigna la campaña
+        ('pausada', 'Pausada'),            # Cuando el usuario la ve pero no la ejecuta
+        ('por_aprobacion', 'Por aprobación'),  # Cuando sube la evidencia
+        ('finalizada', 'Finalizada'),      # Cuando el admin aprueba la evidencia
+    ]
+
+    PERIODICIDADES = [
+        ('Diaria', 'Diaria'),
+        ('Semanal', 'Semanal'),
+        ('Mensual', 'Mensual'),
+        ('Bimestral', 'Bimestral'),
+        ('Trimestral', 'Trimestral'),
+        ('Semestral', 'Semestral'),
+        ('Anual', 'Anual'),
     ]
 
     codigo = models.OneToOneField(CodigoCampaña, on_delete=models.CASCADE)
-    nombre = models.CharField(max_length=100, blank=True, default='')
+    nombre = models.CharField(max_length=100)
     detalle = models.TextField()
-    estado = models.CharField(max_length=10, choices=ESTADOS)
-    
-    # Configuración
+    estado = models.CharField(
+    max_length=20,
+    choices=ESTADOS,
+    default='activa',  # por defecto activa al asignarse
+    blank=True,         # ✅ ya no será obligatorio en formularios
+    null=True,          # ✅ permite valores nulos si no se pasa nada
+    verbose_name="Estado actual"
+)
+
     actividad = models.ForeignKey("Actividad", on_delete=models.SET_NULL, null=True, blank=True)
-    recurso = models.FileField(upload_to='campañas/', null=True, blank=True)  
+    recurso = models.FileField(upload_to='campañas/', null=True, blank=True)
     multimedia = models.FileField(upload_to='campañas/', blank=True, null=True)
-    periodicidad = models.CharField(max_length=100)  # diaria, semanal, etc.
+
+    periodicidad = models.CharField(
+        max_length=20,
+        choices=PERIODICIDADES,
+        blank=True,
+        null=True,
+        verbose_name="Periodicidad"
+    )
+
     horario_inicio = models.TimeField(blank=True, null=True, help_text="Hora de inicio de la pausa")
     evidencia_requerida = models.BooleanField(default=False)
 
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
-    # Asignación
     usuarios = models.ManyToManyField("Usuario", through="CampanaAsignada", blank=True)
     grupos = models.ManyToManyField("Grupo", related_name="campañas", blank=True)
 
     def __str__(self):
         return f"{self.codigo.codigo} - {self.nombre or ''}"
+
+    # ==============================
+    #   MÉTODOS DE CAMBIO DE ESTADO
+    # ==============================
+    def marcar_pausada(self):
+        """Cuando el usuario ve la campaña pero no ejecuta ni sube evidencia."""
+        if self.estado == "activa":
+            self.estado = "pausada"
+            self.save()
+
+    def marcar_por_aprobacion(self):
+        """Cuando el usuario sube la evidencia."""
+        if self.estado in ["activa", "pausada"]:
+            self.estado = "por_aprobacion"
+            self.save()
+
+    def marcar_finalizada(self):
+        """Cuando el admin aprueba la evidencia."""
+        if self.estado == "por_aprobacion":
+            self.estado = "finalizada"
+            self.save()
 
 
 class CampanaAsignada(models.Model):
@@ -161,6 +206,10 @@ class CampanaAsignada(models.Model):
     empleado = models.ForeignKey("Usuario", on_delete=models.CASCADE, null=True, blank=True)
     fecha_asignacion = models.DateTimeField(auto_now_add=True)
     realizada = models.BooleanField(default=False)
+
+    @property
+    def campana(self):
+        return self.campaña
 
     def __str__(self):
         return f"{self.campaña.nombre} asignada a {self.empleado.email}"

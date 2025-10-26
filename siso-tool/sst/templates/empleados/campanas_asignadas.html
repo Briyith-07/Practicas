@@ -1,39 +1,99 @@
-{% extends 'base.html' %}
-
-{% block title %}Campañas Asignadas{% endblock %}
+{% extends "base.html" %}
+{% load static %}
 
 {% block content %}
 <div class="container mt-5">
-  <h2 class="text-center mb-4">Campañas Asignadas</h2>
+  <h2 class="mb-4 text-center">📋 Campañas Asignadas</h2>
 
-  <div class="row">
-    {% for asignada in asignadas %}
-      <div class="col-md-6 mb-4">
-        <div class="card shadow-sm h-100">
-          <div class="card-body">
-            <h5 class="card-title">
-              <strong>Código:</strong> {{ asignada.campaña.codigo.codigo }}
-            </h5>
-            <p class="card-text">
-              {{ asignada.campaña.detalle|truncatewords:20 }}
-            </p>
-            {% if asignada.campaña.fecha_limite %}
-              <p class="mb-2"><strong>Fecha Límite:</strong> {{ asignada.campaña.fecha_limite|date:"d M Y" }}</p>
-            {% endif %}
-            <span class="badge bg-{{ asignada.realizada|yesno:'success,danger' }}">
-              {{ asignada.realizada|yesno:'Realizada,Pendiente' }}
-            </span>
-            <a href="{% url 'registrar_pausa' %}?campaña={{ asignada.campaña.id }}" class="btn btn-sm btn-primary float-end">
-              Realizar Pausa
-            </a>
-          </div>
-        </div>
-      </div>
-    {% empty %}
-      <div class="col-12 text-center">
-        <p class="text-muted">No tienes campañas asignadas.</p>
-      </div>
-    {% endfor %}
-  </div>
+  {% if asignadas %}
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover align-middle text-center shadow-sm">
+        <thead class="table-primary">
+          <tr>
+            <th>Item</th>
+            <th>Código</th>
+            <th>Nombre</th>
+            <th>Detalle</th>
+            <th>Estado</th>
+            <th>Periodicidad</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in asignadas %}
+          <tr>
+            <td>{{ forloop.counter }}</td>
+
+            <!-- Código -->
+            <td>{{ a.campaña.codigo.codigo }}</td>
+
+            <!-- Nombre -->
+            <td>
+              {% if a.campaña.nombre %}
+                {{ a.campaña.nombre }}
+              {% elif a.campaña.codigo.nombre %}
+                {{ a.campaña.codigo.nombre }}
+              {% else %}
+                Sin nombre
+              {% endif %}
+            </td>
+
+            <!-- Detalle -->
+            <td>{{ a.campaña.detalle|truncatewords:15|default_if_none:"Sin detalle" }}</td>
+
+            <!-- Estado dinámico -->
+            <td>
+              {% if a.estado_actual == "finalizada" %}
+                <span class="badge bg-danger">Finalizada</span>
+              {% elif a.estado_actual == "pausada" %}
+                <span class="badge bg-warning text-dark">Pausada</span>
+              {% elif a.estado_actual == "activa" %}
+                <span class="badge bg-success">Activa</span>
+              {% else %}
+                <span class="badge bg-secondary">{{ a.estado_actual|title }}</span>
+              {% endif %}
+            </td>
+
+            <!-- Periodicidad -->
+            <td>{{ a.campaña.periodicidad|default:"-" }}</td>
+
+            <!-- Acción -->
+            <td>
+              {% if a.estado_actual == "finalizada" %}
+                <a href="{% url 'detalle_campania_realizada' a.campaña.id %}" 
+                   class="btn btn-outline-success btn-sm">
+                  📎 Ver Evidencia
+                </a>
+              {% else %}
+                <a href="{% url 'registrar_pausa' a.campaña.id %}" 
+                   class="btn btn-outline-primary btn-sm">
+                  🕒 Registrar Pausa
+                </a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Botón más pequeño para volver al Dashboard -->
+    <div class="text-center mt-3">
+      <a href="{% url 'dashboard_empleado' %}" class="btn btn-secondary btn-sm px-3">
+        ⬅️ Volver
+      </a>
+    </div>
+
+  {% else %}
+    <div class="alert alert-info text-center" role="alert">
+      No tienes campañas asignadas actualmente.
+    </div>
+
+    <div class="text-center mt-3">
+      <a href="{% url 'dashboard_empleado' %}" class="btn btn-secondary btn-sm px-3">
+        ⬅️ Volver
+      </a>
+    </div>
+  {% endif %}
 </div>
 {% endblock %}

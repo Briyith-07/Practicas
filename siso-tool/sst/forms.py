@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from .models import Campaña, Encuesta, Feedback, CodigoCampaña, CampanaAsignada  
 from .models import Grupo
 from .models import Notificacion
-from .models import Usuario, Perfil
+from .models import Usuario, Perfil, EvidenciaCampaña
 
 
 
@@ -121,11 +121,10 @@ class AdminEditarUsuarioForm(forms.ModelForm):
 # -----------------------
 # Campaña
 # -----------------------
-
 class CampañaForm(forms.ModelForm):
     codigo = forms.ModelChoiceField(
         queryset=CodigoCampaña.objects.all(),
-        empty_label="Seleccione un código",  
+        empty_label="Seleccione un código",
         widget=forms.Select(attrs={'class': 'form-control'}),
         required=True,
         label="Código"
@@ -139,26 +138,17 @@ class CampañaForm(forms.ModelForm):
         label="Asignar a empleado"
     )
 
-    class Meta:
-        model = Campaña
-        fields = ['codigo', 'detalle', 'estado', 'periodicidad', 'multimedia']
+    # 👇 Aquí el cambio: ModelChoiceField en lugar de ModelMultipleChoiceField
+    grupos = forms.ModelChoiceField(
+        queryset=Grupo.objects.all(),
+        empty_label="Seleccione un grupo",
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        required=False,
+        label="Asignar a grupo"
+    )
 
-        widgets = {
-            'detalle': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'estado': forms.Select(attrs={'class': 'form-control'}),
-            'multimedia': forms.ClearableFileInput(attrs={'class': 'form-control'}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.fields['codigo'].label_from_instance = lambda obj: f"{obj.codigo} - {obj.nombre}"
-        self.fields['empleado'].label_from_instance = lambda obj: f"{obj.first_name} {obj.last_name}"
-
-        ESTADOS = [('', 'Seleccione un estado')] + list(self.fields['estado'].choices[1:])
-        self.fields['estado'].choices = ESTADOS
-
-        PERIODICIDADES = [
+    periodicidad = forms.ChoiceField(
+        choices=[
             ('', 'Seleccione un periodo'),
             ('Diaria', 'Diaria'),
             ('Semanal', 'Semanal'),
@@ -167,13 +157,40 @@ class CampañaForm(forms.ModelForm):
             ('Trimestral', 'Trimestral'),
             ('Semestral', 'Semestral'),
             ('Anual', 'Anual'),
-        ]
-        self.fields['periodicidad'] = forms.ChoiceField(
-            choices=PERIODICIDADES,
-            widget=forms.Select(attrs={'class': 'form-control'}),
-            label='Periodicidad'
-        )
+        ],
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label='Periodicidad'
+    )
 
+    horario_inicio = forms.DateTimeField(
+        widget=forms.DateTimeInput(
+            attrs={'type': 'datetime-local', 'class': 'form-control'},
+            format='%Y-%m-%dT%H:%M'
+        ),
+        input_formats=['%Y-%m-%dT%H:%M'],
+        label="Horario de inicio"
+    )
+
+    class Meta:
+        model = Campaña
+        fields = [
+            'codigo', 'detalle', 'estado', 'periodicidad',
+            'horario_inicio', 'multimedia', 'empleado', 'grupos',
+            'evidencia_requerida',
+        ]
+        widgets = {
+            'detalle': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'estado': forms.Select(attrs={'class': 'form-control'}),
+            'multimedia': forms.ClearableFileInput(attrs={'class': 'form-control'}),
+            'evidencia_requerida': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['codigo'].label_from_instance = lambda obj: f"{obj.codigo} - {obj.nombre}"
+        self.fields['empleado'].label_from_instance = lambda obj: f"{obj.first_name} {obj.last_name}"
+        ESTADOS = [('', 'Seleccione un estado')] + list(self.fields['estado'].choices[1:])
+        self.fields['estado'].choices = ESTADOS
 # -----------------------
 # Campaña Asignada
 # -----------------------
@@ -330,3 +347,12 @@ class AdminEditarUsuarioForm(forms.ModelForm):
         perfil.cedula = self.cleaned_data['cedula']
         perfil.save()
         return usuario
+    
+#evidencia campaña
+class RegistrarEvidenciaCampañaForm(forms.ModelForm):
+    class Meta:
+        model = EvidenciaCampaña
+        fields = ['archivo']
+        widgets = {
+            'archivo': forms.ClearableFileInput(attrs={'class': 'form-control'})
+        }

@@ -45,7 +45,7 @@ urlpatterns = [
     #CRUD campaña
     path('campañas/', views.listar_campañas, name='listar_campañas'),
     path('campañas/crear/', views.crear_campaña, name='crear_campaña'),
-    path('campañas/editar/<int:id>/', views.editar_campaña, name='editar_campaña'),
+    path('campañas/editar/<int:campaña_id>/', views.editar_campaña, name='editar_campaña'),
     path('campañas/eliminar/<int:id>/', views.eliminar_campaña, name='eliminar_campaña'),
     
     
@@ -74,13 +74,23 @@ urlpatterns = [
     path('estadisticas/campanias/asignadas/', views.campanias_asignadas, name='campanias_asignadas'),
     path('estadisticas/campañas/realizadas/', views.campañas_realizadas, name='campañas_realizadas'),
     path('estadisticas/campañas/sin-realizar/', views.campañas_sin_realizar, name='campañas_sin_realizar'),
+    path('empleado/registrar-pausa/<int:campana_id>/', views.registrar_pausa, name='registrar_pausa'),
+    path('empleado/campania-realizada/<int:campana_id>/', views.detalle_campania_realizada, name='detalle_campania_realizada'),
+    path('campanias/realizadas/', views.campanias_realizadas_empleado, name='campanias_realizadas_empleado'),
+    path('admin/campanas/', views.campanas_admin, name='campanas_admin'),
+
+    
+
+
+
+
     
     
     #empleados
     path('empleado/dashboard/', views.dashboard_empleado, name='dashboard_empleado'),
     path('empleado/campanas-asignadas/', views.campanas_asignadas, name='campanas_asignadas'),
     path('empleado/realizar-campana/', views.realizar_campana, name='realizar_campana'),
-    path('empleado/subir-evidencia/', views.subir_evidencia, name='subir_evidencia'),
+    path('empleado/registrar-evidencia/<int:campaña_id>/', views.registrar_evidencia_campaña, name='registrar_evidencia_campaña'),
     path('empleado/campanas-participadas/', views.campanas_participadas, name='campanas_participadas'),
     path('empleado/feedback/', views.feedback_empleado, name='feedback'),
     
