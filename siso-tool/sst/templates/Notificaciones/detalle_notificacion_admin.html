@@ -6,7 +6,7 @@
 <div class="container mt-5">
     <div class="card shadow-sm border-0">
         <div class="card-header bg-dark text-white text-center">
-            <h4>📌 Detalle de Notificación (Administrador)</h4>
+            <h4>📌 Detalle de Notificación</h4>
         </div>
         <div class="card-body">
             
@@ -23,8 +23,9 @@
                 {% endif %}
             </p>
 
-            <p><strong>Mensaje:</strong> {{ notificacion.mensaje }}</p>
-            <p><strong>Tipo:</strong> {{ notificacion.get_tipo_display }}</p>
+            <!-- 🔹 Aquí se reemplaza el tipo por "Web y Correo" -->
+            <p><strong>Tipo:</strong> Web y Correo</p>
+
             <p><strong>Fecha de envío:</strong> {{ notificacion.fecha_envio|date:"d/m/Y H:i" }}</p>
 
             <p><strong>Enviada:</strong> 
@@ -45,7 +46,7 @@
             </p>
         </div>
         <div class="card-footer text-center">
-            <a href="{% url 'listar_notificaciones' %}" class="btn btn-outline-secondary">⬅ Volver</a>
+            <a href="/admin/notificaciones/" class="btn btn-outline-secondary">⬅ Volver</a>
             <a href="{% url 'editar_notificacion' notificacion.id %}" class="btn btn-warning">✏ Editar</a>
             <a href="{% url 'eliminar_notificacion' notificacion.id %}" class="btn btn-danger">🗑 Eliminar</a>
         </div>

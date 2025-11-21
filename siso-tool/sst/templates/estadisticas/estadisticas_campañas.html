@@ -5,13 +5,15 @@
 <div class="container mt-5">
   <h2 class="mb-5 text-center">📊 Estadísticas de Campañas</h2>
 
-  <!-- Tarjetas Totales -->
-  <div class="row text-center mb-5">
+  <!-- Tarjetas -->
+  <div class="row justify-content-center mb-5">
+
+    <!-- Tarjetas dinámicas -->
     {% for tarjeta in datos_tarjetas %}
     <div class="col-md-3 mb-3">
-      <a href="{% url tarjeta.url %}" class="text-decoration-none">
+      <a href="{% url 'campañas_resumen' %}" class="text-decoration-none">
         <div class="card text-white bg-{{ tarjeta.color }} shadow-sm h-100">
-          <div class="card-body">
+          <div class="card-body text-center">
             <h5 class="card-title">{{ tarjeta.titulo }}</h5>
             <p class="fs-3">{{ tarjeta.total }}</p>
           </div>
@@ -19,10 +21,21 @@
       </a>
     </div>
     {% endfor %}
+
+    
+<div class="col-md-3 mb-3">
+  <a href="{% url 'generar_reportes' %}" class="text-decoration-none">
+    <div class="card text-white bg-success shadow-sm h-100">
+      <div class="card-body text-center">
+        <h5 class="card-title">Descargar Reportes</h5>
+      </div>
+    </div>
+  </a>
+</div>
   </div>
 
   <div class="text-end">
-    <a href="{% url 'estadisticas_menu' %}" class="btn btn-secondary">Volver</a>
+    <a href="{% url 'admin_dashboard' %}" class="btn btn-secondary">Volver</a>
   </div>
 </div>
 {% endblock %}

@@ -2,9 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.utils import timezone
 from django.conf import settings
-
-
-
+from datetime import timedelta
 
 
 
@@ -34,16 +32,14 @@ class UsuarioManager(BaseUserManager):
 
 
 class Usuario(AbstractBaseUser, PermissionsMixin):
-    ROLES = (
-        ('admin', 'Administrador'),
-        ('empleado', 'Empleado'),
-    )
-
     cedula = models.CharField(max_length=20, unique=True)
-    email = models.EmailField(unique=True)
+    email = models.EmailField()
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
-    cargo = models.CharField(max_length=20, choices=ROLES, default='empleado')
+    
+    # Campo nuevo para asignar un rol dinámico
+    rol = models.ForeignKey('Rol', on_delete=models.SET_NULL, null=True, blank=True, related_name='usuarios')
+    
     telefono = models.CharField(max_length=15)
     departamento = models.CharField(max_length=50)
     ciudad = models.CharField(max_length=50)
@@ -55,30 +51,27 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
 
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['cedula', 'first_name', 'last_name', 'telefono', 'departamento', 'ciudad', 'direccion']
+    USERNAME_FIELD = 'cedula'
+    REQUIRED_FIELDS = ['email', 'first_name', 'last_name', 'telefono', 'departamento', 'ciudad', 'direccion']
 
     objects = UsuarioManager()
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
 
-
 class Rol(models.Model):
     nombre = models.CharField(max_length=50, unique=True)
+    permisos = models.ManyToManyField('Permiso', blank=True, related_name='roles')
 
     def __str__(self):
         return self.nombre
 
-
 class Permiso(models.Model):
-    nombre = models.CharField(max_length=100)
+    nombre = models.CharField(max_length=100, unique=True)
     descripcion = models.TextField(blank=True)
-    rol = models.ForeignKey(Rol, on_delete=models.CASCADE, related_name='permisos')
 
     def __str__(self):
-        return f"{self.nombre} ({self.rol.nombre})"
-
+        return self.nombre
 
 # =========================
 #   GRUPOS
@@ -91,28 +84,6 @@ class Grupo(models.Model):
     def __str__(self):
         return self.nombre
 
-
-# =========================
-#   ACTIVIDADES SG-SST
-# =========================
-class Actividad(models.Model):
-    titulo = models.CharField(max_length=200)
-    descripcion = models.TextField()
-    fecha = models.DateField()
-    responsable = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='actividades_responsables')
-
-    def __str__(self):
-        return self.titulo
-
-
-class Seguimiento(models.Model):
-    actividad = models.ForeignKey(Actividad, on_delete=models.CASCADE, related_name='seguimientos')
-    observaciones = models.TextField()
-    fecha = models.DateField(auto_now_add=True)
-    realizado_por = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='seguimientos_realizados')
-
-    def __str__(self):
-        return f"Seguimiento de {self.actividad.titulo} - {self.fecha}"
 
 
 # =========================
@@ -128,38 +99,33 @@ class CodigoCampaña(models.Model):
 
 class Campaña(models.Model):
     ESTADOS = [
-        ('activa', 'Activa'),              # Cuando se asigna la campaña
-        ('pausada', 'Pausada'),            # Cuando el usuario la ve pero no la ejecuta
-        ('por_aprobacion', 'Por aprobación'),  # Cuando sube la evidencia
-        ('finalizada', 'Finalizada'),      # Cuando el admin aprueba la evidencia
+        ('activa', 'Activa'),
+        ('pausada', 'Pausada'),
+        ('por_aprobacion', 'Por aprobación'),
+        ('finalizada', 'Finalizada'),
+        ('rechazada', 'Rechazada'),
+        ('aprobada', 'Aprobada'),
     ]
 
     PERIODICIDADES = [
         ('Diaria', 'Diaria'),
         ('Semanal', 'Semanal'),
         ('Mensual', 'Mensual'),
-        ('Bimestral', 'Bimestral'),
-        ('Trimestral', 'Trimestral'),
-        ('Semestral', 'Semestral'),
-        ('Anual', 'Anual'),
     ]
 
-    codigo = models.OneToOneField(CodigoCampaña, on_delete=models.CASCADE)
+    codigo = models.ForeignKey(CodigoCampaña, on_delete=models.CASCADE)
     nombre = models.CharField(max_length=100)
     detalle = models.TextField()
     estado = models.CharField(
-    max_length=20,
-    choices=ESTADOS,
-    default='activa',  # por defecto activa al asignarse
-    blank=True,         # ✅ ya no será obligatorio en formularios
-    null=True,          # ✅ permite valores nulos si no se pasa nada
-    verbose_name="Estado actual"
-)
-
-    actividad = models.ForeignKey("Actividad", on_delete=models.SET_NULL, null=True, blank=True)
+        max_length=20,
+        choices=ESTADOS,
+        default='activa',
+        blank=True,
+        null=True,
+        verbose_name="Estado actual"
+    )
     recurso = models.FileField(upload_to='campañas/', null=True, blank=True)
     multimedia = models.FileField(upload_to='campañas/', blank=True, null=True)
-
     periodicidad = models.CharField(
         max_length=20,
         choices=PERIODICIDADES,
@@ -167,54 +133,59 @@ class Campaña(models.Model):
         null=True,
         verbose_name="Periodicidad"
     )
-
-    horario_inicio = models.TimeField(blank=True, null=True, help_text="Hora de inicio de la pausa")
     evidencia_requerida = models.BooleanField(default=False)
-
     fecha_creacion = models.DateTimeField(auto_now_add=True)
-
     usuarios = models.ManyToManyField("Usuario", through="CampanaAsignada", blank=True)
     grupos = models.ManyToManyField("Grupo", related_name="campañas", blank=True)
 
     def __str__(self):
         return f"{self.codigo.codigo} - {self.nombre or ''}"
-
+    
     # ==============================
     #   MÉTODOS DE CAMBIO DE ESTADO
     # ==============================
     def marcar_pausada(self):
-        """Cuando el usuario ve la campaña pero no ejecuta ni sube evidencia."""
         if self.estado == "activa":
             self.estado = "pausada"
             self.save()
 
     def marcar_por_aprobacion(self):
-        """Cuando el usuario sube la evidencia."""
         if self.estado in ["activa", "pausada"]:
             self.estado = "por_aprobacion"
             self.save()
 
     def marcar_finalizada(self):
-        """Cuando el admin aprueba la evidencia."""
         if self.estado == "por_aprobacion":
             self.estado = "finalizada"
             self.save()
-
-
+            
 class CampanaAsignada(models.Model):
-    campaña = models.ForeignKey(Campaña, on_delete=models.CASCADE)
+    campaña = models.ForeignKey("Campaña", on_delete=models.CASCADE)
     empleado = models.ForeignKey("Usuario", on_delete=models.CASCADE, null=True, blank=True)
     fecha_asignacion = models.DateTimeField(auto_now_add=True)
+    fecha_vencimiento = models.DateTimeField(null=True, blank=True) 
     realizada = models.BooleanField(default=False)
+    observacion_admin = models.TextField(blank=True, null=True, verbose_name="Observación del Administrador")
 
-    @property
-    def campana(self):
-        return self.campaña
+    def calcular_fecha_vencimiento(self):
+        """Calcula la fecha de vencimiento según la periodicidad de la campaña."""
+        inicio = self.fecha_asignacion  
+        if self.campaña.periodicidad == "Diaria":
+            return inicio + timedelta(days=1)
+        elif self.campaña.periodicidad == "Semanal":
+            return inicio + timedelta(weeks=1)
+        elif self.campaña.periodicidad == "Mensual":
+            return inicio + timedelta(days=30)
+        else:
+            return inicio + timedelta(days=3) 
+
+    def save(self, *args, **kwargs):
+        if not self.fecha_vencimiento:
+            self.fecha_vencimiento = self.calcular_fecha_vencimiento()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.campaña.nombre} asignada a {self.empleado.email}"
-
-
 # =========================
 #   NOTIFICACIONES
 # =========================
@@ -237,8 +208,9 @@ class Notificacion(models.Model):
         ('web', 'Notificación Web'),
     ]   
 
-    campaña = models.ForeignKey("Campaña", on_delete=models.CASCADE)
+    campaña = models.ForeignKey( "Campaña",on_delete=models.CASCADE,null=True,blank=True)
     usuario = models.ForeignKey("Usuario", on_delete=models.CASCADE)
+    remitente = models.ForeignKey("Usuario", on_delete=models.SET_NULL, null=True, blank=True, related_name="enviadas") 
     cedula = models.CharField(max_length=20, blank=True, null=True)
     titulo = models.CharField(max_length=200)
     mensaje = models.TextField()
@@ -322,3 +294,41 @@ class Perfil(models.Model):
 
     def __str__(self):
         return self.user.email
+
+#recursos
+class RecursoSSTAdmin(models.Model):
+    TIPOS = [
+        ('documento', 'Documento'),
+        ('video', 'Video'),
+        ('imagen', 'Imagen'),
+    ]
+
+    titulo = models.CharField(max_length=200)
+    archivo = models.FileField(upload_to='recursos_sst/')
+    tipo = models.CharField(max_length=20, choices=TIPOS)
+    descripcion = models.TextField(blank=True, null=True)
+    fecha_subida = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.titulo
+
+
+class RecursoSSTEmpleado(models.Model):
+    recurso = models.ForeignKey(RecursoSSTAdmin, on_delete=models.CASCADE)
+    visible = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.recurso.titulo} - {'Visible' if self.visible else 'Oculto'}"
+
+class Mensaje(models.Model):
+    titulo = models.CharField(max_length=200)
+    contenido = models.TextField()
+    creado = models.DateTimeField(auto_now_add=True)
+    actualizado = models.DateTimeField(auto_now=True)
+    fecha_evento = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-creado']
+
+    def __str__(self):
+        return self.titulo

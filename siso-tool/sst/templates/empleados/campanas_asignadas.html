@@ -5,6 +5,51 @@
 <div class="container mt-5">
   <h2 class="mb-4 text-center">📋 Campañas Asignadas</h2>
 
+  <!-- Filtros -->
+  <form method="get" class="row g-2 mb-4 align-items-end">
+    <!-- Estado -->
+    <div class="col-6 col-md-3">
+      <label for="estado" class="form-label">Estado</label>
+      <select name="estado" id="estado" class="form-select form-select-sm">
+        <option value="">Todos</option>
+        <option value="activa" {% if filtros.estado == 'activa' %}selected{% endif %}>Activa</option>
+        <option value="pausada" {% if filtros.estado == 'pausada' %}selected{% endif %}>Pausada</option>
+        <option value="finalizada" {% if filtros.estado == 'finalizada' %}selected{% endif %}>Finalizada</option>
+        <option value="en revisión" {% if filtros.estado == 'en revisión' %}selected{% endif %}>En revisión</option>
+      </select>
+    </div>
+
+    <!-- Periodicidad -->
+    <div class="col-6 col-md-3">
+      <label for="periodicidad" class="form-label">Periodicidad</label>
+      <select name="periodicidad" id="periodicidad" class="form-select form-select-sm">
+        <option value="">Todos</option>
+        {% for p in periodicidades_disponibles %}
+          <option value="{{ p }}" {% if filtros.periodicidad == p %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Fecha desde -->
+    <div class="col-6 col-md-2">
+      <label for="fecha_desde" class="form-label">Desde</label>
+      <input type="date" name="fecha_desde" id="fecha_desde" class="form-control form-control-sm" value="{{ filtros.fecha_desde }}">
+    </div>
+
+    <!-- Fecha hasta -->
+    <div class="col-6 col-md-2">
+      <label for="fecha_hasta" class="form-label">Hasta</label>
+      <input type="date" name="fecha_hasta" id="fecha_hasta" class="form-control form-control-sm" value="{{ filtros.fecha_hasta }}">
+    </div>
+
+    <!-- Botones -->
+    <div class="col-6 col-md-2 d-flex gap-1">
+      <button type="submit" class="btn btn-primary btn-sm flex-fill">Filtrar</button>
+      <a href="{% url 'campanas_asignadas' %}" class="btn btn-secondary btn-sm flex-fill">Limpiar</a>
+    </div>
+  </form>
+
+  <!-- Tabla de campañas -->
   {% if asignadas %}
     <div class="table-responsive">
       <table class="table table-bordered table-hover align-middle text-center shadow-sm">
@@ -16,6 +61,8 @@
             <th>Detalle</th>
             <th>Estado</th>
             <th>Periodicidad</th>
+            <th>Fecha de creación</th>
+            <th>Fecha de vencimiento</th>
             <th>Acción</th>
           </tr>
         </thead>
@@ -23,25 +70,9 @@
           {% for a in asignadas %}
           <tr>
             <td>{{ forloop.counter }}</td>
-
-            <!-- Código -->
             <td>{{ a.campaña.codigo.codigo }}</td>
-
-            <!-- Nombre -->
-            <td>
-              {% if a.campaña.nombre %}
-                {{ a.campaña.nombre }}
-              {% elif a.campaña.codigo.nombre %}
-                {{ a.campaña.codigo.nombre }}
-              {% else %}
-                Sin nombre
-              {% endif %}
-            </td>
-
-            <!-- Detalle -->
+            <td>{{ a.nombre_campaña }}</td>
             <td>{{ a.campaña.detalle|truncatewords:15|default_if_none:"Sin detalle" }}</td>
-
-            <!-- Estado dinámico -->
             <td>
               {% if a.estado_actual == "finalizada" %}
                 <span class="badge bg-danger">Finalizada</span>
@@ -53,22 +84,14 @@
                 <span class="badge bg-secondary">{{ a.estado_actual|title }}</span>
               {% endif %}
             </td>
-
-            <!-- Periodicidad -->
             <td>{{ a.campaña.periodicidad|default:"-" }}</td>
-
-            <!-- Acción -->
+            <td>{{ a.campaña.fecha_creacion|date:"d/m/Y" }}</td>
+            <td>{{ a.fecha_vencimiento|date:"d/m/Y" }}</td>
             <td>
               {% if a.estado_actual == "finalizada" %}
-                <a href="{% url 'detalle_campania_realizada' a.campaña.id %}" 
-                   class="btn btn-outline-success btn-sm">
-                  📎 Ver Evidencia
-                </a>
+                <a href="{% url 'detalle_campania_realizada' a.campaña.id %}" class="btn btn-outline-success btn-sm">📎 Ver Evidencia</a>
               {% else %}
-                <a href="{% url 'registrar_pausa' a.campaña.id %}" 
-                   class="btn btn-outline-primary btn-sm">
-                  🕒 Registrar Pausa
-                </a>
+                <a href="{% url 'registrar_pausa' a.campaña.id %}" class="btn btn-outline-primary btn-sm">🕒 Registrar Pausa</a>
               {% endif %}
             </td>
           </tr>
@@ -77,22 +100,14 @@
       </table>
     </div>
 
-    <!-- Botón más pequeño para volver al Dashboard -->
     <div class="text-center mt-3">
-      <a href="{% url 'dashboard_empleado' %}" class="btn btn-secondary btn-sm px-3">
-        ⬅️ Volver
-      </a>
+      <a href="{% url 'dashboard_empleado' %}" class="btn btn-secondary btn-sm px-3">⬅️ Volver</a>
     </div>
 
   {% else %}
-    <div class="alert alert-info text-center" role="alert">
-      No tienes campañas asignadas actualmente.
-    </div>
-
+    <div class="alert alert-info text-center">No tienes campañas asignadas actualmente.</div>
     <div class="text-center mt-3">
-      <a href="{% url 'dashboard_empleado' %}" class="btn btn-secondary btn-sm px-3">
-        ⬅️ Volver
-      </a>
+      <a href="{% url 'dashboard_empleado' %}" class="btn btn-secondary btn-sm px-3">⬅️ Volver</a>
     </div>
   {% endif %}
 </div>

@@ -9,7 +9,7 @@
       <tr>
         <th>Nombre</th>
         <th>Email</th>
-        <th>Cargo</th>
+        <th>Rol</th>
         <th>Ciudad</th>
         <th>Rol</th>
       </tr>
@@ -19,7 +19,7 @@
       <tr>
         <td>{{ u.first_name }} {{ u.last_name }}</td>
         <td>{{ u.email }}</td>
-        <td>{{ u.cargo }}</td>
+        <td>{{ u.rol }}</td>
         <td>{{ u.ciudad }}</td>
         <td>{% if u.is_superuser %}Administrador{% else %}Empleado{% endif %}</td>
       </tr>

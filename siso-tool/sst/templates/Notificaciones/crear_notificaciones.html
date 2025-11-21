@@ -66,12 +66,6 @@
         {{ form.mensaje|add_class:"form-control" }}
       </div>
 
-      <!-- Tipo de notificación -->
-      <div class="mb-3">
-        <label class="form-label fw-semibold">Tipo</label>
-        {{ form.tipo|add_class:"form-select" }}
-      </div>
-
       <!-- Botones -->
       <div class="text-center mt-4">
         <button type="submit" class="btn btn-success px-4 me-2">
@@ -108,9 +102,21 @@ selectCampaña.addEventListener("change", function() {
         document.getElementById("detalle").value = campaña.detalle;
         document.getElementById("estado").value = campaña.estado;
         document.getElementById("periodicidad").value = campaña.periodicidad;
-        document.getElementById("fecha_creacion").value = campaña.fecha_creacion;
 
-        // Mostrar siempre como link
+        // Formatear solo fecha y hora
+        if (campaña.fecha_creacion) {
+            const fecha = new Date(campaña.fecha_creacion);
+            const fechaFormateada = fecha.getFullYear() + '-' +
+                String(fecha.getMonth() + 1).padStart(2, '0') + '-' +
+                String(fecha.getDate()).padStart(2, '0') + ' ' +
+                String(fecha.getHours()).padStart(2, '0') + ':' +
+                String(fecha.getMinutes()).padStart(2, '0');
+            document.getElementById("fecha_creacion").value = fechaFormateada;
+        } else {
+            document.getElementById("fecha_creacion").value = "";
+        }
+
+        // Mostrar multimedia
         const multimediaEl = document.getElementById("multimedia-container");
         if (campaña.multimedia) {
             multimediaEl.innerHTML = `<a href="${campaña.multimedia}" target="_blank" class="btn btn-link">Abrir archivo</a>`;

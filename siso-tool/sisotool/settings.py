@@ -19,6 +19,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'sst.apps.SstConfig', 
     'widget_tweaks',
+    'crispy_forms',
+    'crispy_bootstrap5',
      
 ]
 
@@ -112,5 +114,8 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'briyith.jimenez2001@gmail.com'  
 EMAIL_HOST_PASSWORD = 'lgffqclcnxqvzvgn'    
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
-
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
+CRISPY_TEMPLATE_PACK = "bootstrap5"
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'dashboard_empleado'
 

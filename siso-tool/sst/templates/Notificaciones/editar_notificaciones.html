@@ -35,27 +35,21 @@
                     </div>
                 </div>
 
-                <!-- Campaña (código - nombre) -->
+                <!-- Campaña (solo si NO es informativa) -->
+                {% if not informativa %}
                 <div class="row mb-3">
                     <label class="col-sm-3 col-form-label fw-bold">Campaña:</label>
                     <div class="col-sm-9">
                         {{ form.campaña|add_class:"form-select" }}
                     </div>
                 </div>
+                {% endif %}
 
                 <!-- Mensaje -->
                 <div class="row mb-3">
                     <label class="col-sm-3 col-form-label fw-bold">Mensaje:</label>
                     <div class="col-sm-9">
                         {{ form.mensaje|add_class:"form-control" }}
-                    </div>
-                </div>
-
-                <!-- Tipo -->
-                <div class="row mb-3">
-                    <label class="col-sm-3 col-form-label fw-bold">Tipo:</label>
-                    <div class="col-sm-9">
-                        {{ form.tipo|add_class:"form-select" }}
                     </div>
                 </div>
 
