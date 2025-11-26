@@ -6,8 +6,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Quick-start development settings - unsuitable for production
 SECRET_KEY = 'django-insecure-l6&hd#qsy(a(aq-)u9$3@)h((z@v6(^=!p8%-q3sv+$e&dklpd'
-DEBUG = True
-ALLOWED_HOSTS = []
+DEBUG = False
+ALLOWED_HOSTS = ['*']
 
 # Application definition
 INSTALLED_APPS = [
@@ -99,9 +99,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Modelo de usuario personalizado
 AUTH_USER_MODEL = 'sst.Usuario'
+STATIC_ROOT = BASE_DIR / 'staticfiles' 
 
-MEDIA_ROOT = os.path.join(BASE_DIR, 'multimedia')
-MEDIA_URL = '/multimedia/'
+MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_URL = '/media/'
 
 # Crear la carpeta si no existe
 if not os.path.exists(MEDIA_ROOT):

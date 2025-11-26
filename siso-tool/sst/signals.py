@@ -12,7 +12,7 @@ def notificar_asignacion_campaña(sender, instance, created, **kwargs):
         campaña = instance.campaña
         asignacion = instance
 
-        # Datos seguros
+        
         nombre_campaña = campaña.codigo.nombre if campaña.codigo else "Sin nombre"
         codigo_campaña = campaña.codigo.codigo if campaña.codigo else "N/A"
         fecha_creacion = campaña.fecha_creacion.strftime("%d/%m/%Y")
