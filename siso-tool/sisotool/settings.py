@@ -1,15 +1,20 @@
 from pathlib import Path
 import os
+import dj_database_url
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Quick-start development settings - unsuitable for production
-SECRET_KEY = 'django-insecure-l6&hd#qsy(a(aq-)u9$3@)h((z@v6(^=!p8%-q3sv+$e&dklpd'
-DEBUG = False
-ALLOWED_HOSTS = ['*']
+# -----------------------------
+# VARIABLES DE ENTORNO
+# -----------------------------
+SECRET_KEY = os.environ.get("SECRET_KEY")
+DEBUG = os.environ.get("DEBUG", "False").lower() == "true"
 
-# Application definition
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", ".onrender.com").split(",")
+
+# -----------------------------
+# APLICACIONES
+# -----------------------------
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -17,15 +22,21 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'sst.apps.SstConfig', 
+    'sst.apps.SstConfig',
     'widget_tweaks',
     'crispy_forms',
     'crispy_bootstrap5',
-     
 ]
 
+# -----------------------------
+# MIDDLEWARE + WHITENOISE
+# -----------------------------
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+
+    # Requerido para Render (sirve archivos estáticos)
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -40,9 +51,9 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
-    BASE_DIR / 'templates',
-    BASE_DIR / 'sst' / 'templates',  
-],
+            BASE_DIR / 'templates',
+            BASE_DIR / 'sst' / 'templates',
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -57,66 +68,73 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'sisotool.wsgi.application'
 
-# Base de datos PostgreSQL
+# -----------------------------
+# BASE DE DATOS (Render PostgreSQL)
+# -----------------------------
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'SisoTool',
-        'USER': 'postgres',
-        'PASSWORD': '1234',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get("DATABASE_URL"),
+        conn_max_age=600,
+        ssl_require=True
+    )
 }
 
-# Validadores de contraseñas
+# -----------------------------
+# VALIDADORES DE CONTRASEÑA
+# -----------------------------
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {"NAME": 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {"NAME": 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {"NAME": 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {"NAME": 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# Internacionalización
+# -----------------------------
+# INTERNACIONALIZACIÓN
+# -----------------------------
 LANGUAGE_CODE = 'es-co'
 TIME_ZONE = 'America/Bogota'
 USE_I18N = True
 USE_TZ = True
 
-# Archivos estáticos (CSS, JS, imágenes)
-STATIC_URL = 'static/'
+# -----------------------------
+# STATICFILES CONFIG (RENDER)
+# -----------------------------
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# Campo por defecto para claves primarias
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# Modelo de usuario personalizado
-AUTH_USER_MODEL = 'sst.Usuario'
-STATIC_ROOT = BASE_DIR / 'staticfiles' 
-
-MEDIA_ROOT = BASE_DIR / 'media'
+# -----------------------------
+# MEDIA
+# -----------------------------
 MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
-# Crear la carpeta si no existe
-if not os.path.exists(MEDIA_ROOT):
-    os.makedirs(MEDIA_ROOT)
-    
+# -----------------------------
+# USUARIO PERSONALIZADO
+# -----------------------------
+AUTH_USER_MODEL = 'sst.Usuario'
+
+# -----------------------------
+# EMAIL (CON VARIABLES DE ENTORNO)
+# -----------------------------
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'briyith.jimenez2001@gmail.com'  
-EMAIL_HOST_PASSWORD = 'lgffqclcnxqvzvgn'    
+EMAIL_HOST_USER = os.environ.get("EMAIL_USER")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_PASSWORD")
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+# -----------------------------
+# CRISPY FORMS
+# -----------------------------
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
+
+# -----------------------------
+# LOGIN
+# -----------------------------
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard_empleado'
-
