@@ -1,2 +1,2 @@
-web: gunicorn sisotool.wsgi
+web: gunicorn sisotool.wsgi:application
 
